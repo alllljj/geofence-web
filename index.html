@@ -50,13 +50,37 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
 .mode-btn { flex:1; padding:8px; border:1px solid var(--line); background:transparent; color:var(--dim); border-radius:8px; font-size:13px; cursor:pointer; }
 .mode-btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
 .coord-input { width:100%; padding:9px 10px; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:8px; font-size:13px; margin-top:8px; font-family:monospace; }
+/* 登录页 */
+#loginOverlay { position:fixed; inset:0; z-index:5000; background:var(--bg); display:none; align-items:center; justify-content:center; }
+#loginOverlay.show { display:flex; }
+.login-box { width:min(320px, 88vw); background:var(--card); border:1px solid var(--line); border-radius:16px; padding:28px 22px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+.login-logo { font-size:44px; margin-bottom:8px; }
+.login-box h2 { font-size:18px; margin-bottom:4px; }
+.login-sub { font-size:13px; color:var(--dim); margin-bottom:6px; }
+#loginErr { color:var(--red); font-size:13px; min-height:18px; margin-top:10px; }
 </style>
 </head>
 <body>
 
+<!-- ================= 登录页 (未登录时显示) ================= -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🛰️</div>
+    <h2>电子围栏 · 远程监控</h2>
+    <p class="login-sub">请登录后访问</p>
+    <input class="coord-input" id="loginUser" placeholder="账号" autocomplete="username" style="margin-top:16px" />
+    <input class="coord-input" id="loginPass" type="password" placeholder="密码" autocomplete="current-password" style="margin-top:10px" />
+    <button class="btn btn-primary" style="margin-top:16px" onclick="doLogin()">登 录</button>
+    <div class="hint" style="text-align:center" id="loginErr"></div>
+  </div>
+</div>
+
 <header>
   <h1><span id="statusDot"></span> 电子围栏 · 远程监控</h1>
-  <span style="font-size:12px;color:var(--dim)" id="lastUpdate">--:--:--</span>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:12px;color:var(--dim)" id="lastUpdate">--:--:--</span>
+    <button onclick="doLogout()" style="background:var(--line);border:none;color:var(--dim);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">退出</button>
+  </div>
 </header>
 
 <div class="alert-banner" id="alertBanner">🚨 设备已进入危险区！</div>
@@ -114,6 +138,47 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
 <div id="toast"></div>
 
 <script>
+// ================= 登录验证 =================
+// 简单前端登录: 账号/密码校验 + sessionStorage 会话标记
+// ⚠️ 注意: 纯前端登录仅作访问门槛, 非高安全方案 (源码可见凭据)
+const AUTH_USER = 'DZWL54';
+const AUTH_PASS = 'dzwl54';
+function authOk() { return sessionStorage.getItem('gf_auth') === '1'; }
+function requireAuth() {
+  const ov = document.getElementById('loginOverlay');
+  if (!authOk()) {
+    ov.classList.add('show');
+    return false;
+  }
+  ov.classList.remove('show');
+  return true;
+}
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  if (u === AUTH_USER && p === AUTH_PASS) {
+    sessionStorage.setItem('gf_auth', '1');
+    err.textContent = '';
+    document.getElementById('loginOverlay').classList.remove('show');
+    toast('欢迎回来');
+    init();
+  } else {
+    err.textContent = '账号或密码错误';
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('gf_auth');
+  location.reload();
+}
+// 回车提交
+function loginKey(e) { if (e.key === 'Enter') doLogin(); }
+document.addEventListener('DOMContentLoaded', function(){
+  document.getElementById('loginPass').addEventListener('keydown', loginKey);
+  document.getElementById('loginUser').addEventListener('keydown', loginKey);
+  requireAuth();  // 未登录显示登录层, 已登录则隐藏
+});
+
 // ================= 配置 =================
 // ⚠️ 部署前修改: 你的巴法云 UID 和主题
 const BEMFA_UID = '050042db7c93475090e07b207e55d01a';
@@ -379,7 +444,8 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-init();
+// 已登录才初始化 (DOMContentLoaded 中 requireAuth 成功后也会调用 init)
+if (authOk()) init();
 </script>
 </body>
 </html>
