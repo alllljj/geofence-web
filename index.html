@@ -6,6 +6,14 @@
 <title>电子围栏 · 远程监控</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// 地图瓦片源: 国内可访问的备选 (高德/腾讯/天地图), 依次尝试
+var TILE_PROVIDERS = [
+  { name:'腾讯', url:'https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=199', sub:'0123' },
+  { name:'高德', url:'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', sub:'1234' },
+  { name:'OSM', url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub:'abc' }
+];
+</script>
 <style>
 :root { --bg:#0f1520; --card:#1a2332; --line:#2a3648; --text:#e8eef7; --dim:#8aa0b8; --green:#22c55e; --red:#ef4444; --blue:#3b82f6; --amber:#f59e0b; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -119,18 +127,15 @@ const POS_URL = 'position.json';
 
 // ================= 状态 =================
 let mode = 'view';
-let map, deviceMarker, fenceLayer, tempLayer;
+let map, deviceMarker, fenceLayer, tempLayer, tileLayer;
 let drawing = [];        // 画点中的临时顶点
 let fenceVerts = [];     // 当前围栏
 let lastState = { lat:null, lon:null, sats:0, inFence:false, dist:0 };
 
-// ================= 初始化 =================
 function init() {
   map = L.map('map', { zoomControl:false }).setView([39.796, 116.401], 15);
   L.control.zoom({ position:'bottomright' }).addTo(map);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution:'© OpenStreetMap', maxZoom:19
-  }).addTo(map);
+  addTileLayer(0);
 
   deviceMarker = L.marker([39.796,116.401], {
     icon: L.divIcon({ html:'<div style="width:14px;height:14px;background:#3b82f6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 10px #3b82f6"></div>', className:'', iconSize:[20,20], iconAnchor:[10,10] })
@@ -143,6 +148,16 @@ function init() {
   setInterval(loadPosition, 10000);  // 10 秒轮询
   loadFence();
   setInterval(loadFence, 30000);
+}
+// 依次尝试地图源, 失败则换下一个
+function addTileLayer(idx) {
+  if (idx >= TILE_PROVIDERS.length) { console.warn('所有地图源均不可用'); return; }
+  var p = TILE_PROVIDERS[idx];
+  var url = p.url.replace('{s}', p.sub[0]);
+  if (tileLayer) map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(p.url, { subdomains:p.sub, maxZoom:19, attribution:'© ' + p.name });
+  tileLayer.addTo(map);
+  tileLayer.on('tileerror', function(){ tileLayer.off('tileerror'); addTileLayer(idx+1); });
 }
 function setMode(m) {
   mode = m;
