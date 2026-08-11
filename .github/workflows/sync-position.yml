@@ -11,7 +11,7 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
 
@@ -21,32 +21,38 @@ jobs:
           TOPIC: ${{ secrets.BEMFA_TOPIC }}
         run: |
           python3 - <<'EOF'
-          import socket, json, os, time
+          import socket, json, os, time, re
 
           UID = os.environ.get('BEMFA_UID', '')
           TOPIC = os.environ.get('BEMFA_TOPIC', 'geofence001')
           out = {"position": {"lat": 0, "lon": 0, "sats": 0, "inFence": False, "dist": 0, "ts": 0}}
 
-          try:
-              s = socket.create_connection(('bemfa.com', 8344), timeout=10)
-              s.settimeout(8)
-              # cmd=3: 订阅并获取一次已推送的消息 (设备最新上报)
-              s.sendall(('cmd=3&uid=%s&topic=%s\r\n' % (UID, TOPIC)).encode())
-              buf = b''
+          def try_pull(wait_s):
+              """连巴法云 cmd=3 拉一次, 等 wait_s 秒收数据"""
               try:
-                  while True:
-                      chunk = s.recv(4096)
-                      if not chunk: break
-                      buf += chunk
-                      if b'\n' in buf or len(buf) > 2048: break
-              except socket.timeout:
-                  pass
-              s.close()
-              txt = buf.decode('utf-8', errors='replace')
+                  s = socket.create_connection(('bemfa.com', 8344), timeout=10)
+                  s.settimeout(wait_s)
+                  s.sendall(('cmd=3&uid=%s&topic=%s\r\n' % (UID, TOPIC)).encode())
+                  buf = b''
+                  try:
+                      while True:
+                          chunk = s.recv(4096)
+                          if not chunk: break
+                          buf += chunk
+                          # cmd=3 只回一条, 拿到就够
+                          if b'cmd=3' in buf: break
+                  except socket.timeout:
+                      pass
+                  s.close()
+                  return buf.decode('utf-8', errors='replace')
+              except Exception as e:
+                  return 'ERR:' + str(e)
 
-              # 解析 msg= 字段 (设备格式: lat,lon,sats,inFence,dist)
-              import re
-              m = re.search(r'msg=([^,\r\n]+),([^,\r\n]+),(\d+),(\d+),([0-9.]+)', txt)
+          # 拉 3 次 (每次等 12 秒), 提高命中设备 30s 上报周期的概率
+          txt = ''
+          for i in range(3):
+              txt = try_pull(12)
+              m = re.search(r'msg=(-?[\d.]+),(-?[\d.]+),(\d+),(\d+),([\d.]+)', txt)
               if m:
                   lat, lon = float(m.group(1)), float(m.group(2))
                   if abs(lat) > 0.0001 or abs(lon) > 0.0001:
@@ -57,12 +63,14 @@ jobs:
                           "dist": float(m.group(5)),
                           "ts": int(time.time())
                       }
-          except Exception as e:
-              out["error"] = str(e)
+                      print("OK lat=%.6f lon=%.6f sats=%s inFence=%s dist=%s" % (lat, lon, m.group(3), m.group(4), m.group(5)))
+                      break
+              time.sleep(1)
+          if out["position"]["lat"] == 0:
+              print("WARN no fresh position, last raw: %s" % txt[:120])
 
           with open('position.json', 'w', encoding='utf-8') as f:
               json.dump(out, f, ensure_ascii=False)
-          print(json.dumps(out, ensure_ascii=False))
           EOF
 
       - name: Commit and push
