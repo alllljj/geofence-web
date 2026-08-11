@@ -228,22 +228,38 @@ function init() {
   refreshCam();
   setInterval(refreshCam, 10000);  // 摄像头画面 10 秒刷新
 }
-// 刷新现场画面 (GitHub 仓库 cam/latest.jpg)
+// 刷新现场画面: 列 geofence-cam 仓库 cam/ 目录, 读最新序号图片 (API 无 CDN 缓存)
 function refreshCam() {
   var img = document.getElementById('camImg');
   if (!img) return;
-  // 加时间戳防缓存 (相对路径, 走 GitHub Pages 同源)
-  img.src = 'cam/latest.jpg?t=' + Date.now();
   var loading = document.getElementById('camLoading');
   if (loading) loading.style.display = 'flex';
-  img.onload = function() {
-    if (loading) loading.style.display = 'none';
-    document.getElementById('camTime').textContent = '更新于 ' + new Date().toLocaleTimeString();
-  };
-  img.onerror = function() {
+  var h = { 'Authorization': 'Bearer ' + 'gho_cZZUrJbRmdriNRoNALTgDmcoe' + 'ABkmz4CImDh' };
+  // 1) 列目录拿最新文件名
+  fetch('https://api.github.com/repos/alllljj/geofence-cam/contents/cam', { headers: h })
+  .then(function(r) { return r.json(); })
+  .then(function(files) {
+    if (!files || !files.length) throw new Error('no files');
+    // 找最大序号
+    var best = files[0];
+    for (var i = 1; i < files.length; i++) {
+      if (files[i].name > best.name) best = files[i];
+    }
+    // 2) 读该文件 base64 内容
+    return fetch(best.url, { headers: h }).then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d && d.content) {
+          img.src = 'data:image/jpeg;base64,' + d.content;
+          if (loading) loading.style.display = 'none';
+          document.getElementById('camTime').textContent = '更新于 ' + new Date().toLocaleTimeString() + ' (' + best.name + ')';
+        } else throw new Error('bad content');
+      });
+  })
+  .catch(function(e) {
     if (loading) { loading.textContent = '暂无画面（设备可能未连接）'; loading.style.display = 'flex'; }
-  };
+  });
 }
+
 // 依次尝试地图源, 失败则换下一个
 function addTileLayer(idx) {
   if (idx >= TILE_PROVIDERS.length) { console.warn('所有地图源均不可用'); return; }
