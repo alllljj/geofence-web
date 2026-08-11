@@ -9,8 +9,8 @@
 <script>
 // 地图瓦片源: 国内可访问的备选 (高德/腾讯/天地图), 依次尝试
 var TILE_PROVIDERS = [
-  { name:'腾讯', url:'https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=199', sub:'0123' },
-  { name:'高德', url:'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', sub:'1234' },
+  { name:'高德', url:'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', sub:'124' },
+  { name:'腾讯', url:'https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=199', sub:'123' },
   { name:'OSM', url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', sub:'abc' }
 ];
 </script>
@@ -264,7 +264,52 @@ function applyPosition(p) {
   };
   updateUI();
 }
-function markOffline() {
+
+// 射线法 point-in-polygon (本地计算, 不依赖云端 inFence 字段)
+// verts 元素为 [lat, lon]; 内部按 (x=lon, y=lat) 平面坐标做射线法
+function pointInPolygon(lat, lon, verts) {
+  if (!verts || verts.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+    const xi = verts[i][1], yi = verts[i][0];   // x=lon, y=lat
+    const xj = verts[j][1], yj = verts[j][0];
+    const intersect = ((yi > lat) !== (yj > lat)) &&
+      (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// 用本地围栏 + 设备坐标重算 inFence (画新围栏后立即生效)
+function localInFence() {
+  if (!lastState.lat || fenceVerts.length < 3) return false;
+  return pointInPolygon(lastState.lat, lastState.lon, fenceVerts);
+}
+
+// 点到围栏多边形的最短距离 (米) — 用于新围栏画完后立即显示准确距离
+function distToFence(lat, lon, verts) {
+  if (!verts || verts.length < 3) return null;
+  const R = 6371000;
+  let minD = Infinity;
+  for (let i = 0; i < verts.length; i++) {
+    const a = verts[i], b = verts[(i+1) % verts.length];
+    // 球面近似: 将经纬度转为局部平面米制坐标 (以设备点为原点)
+    const lat0 = lat * Math.PI / 180;
+    const mPerDegLat = 111320;
+    const mPerDegLon = 111320 * Math.cos(lat0);
+    const ax = (a[1] - lon) * mPerDegLon, ay = (a[0] - lat) * mPerDegLat;
+    const bx = (b[1] - lon) * mPerDegLon, by = (b[0] - lat) * mPerDegLat;
+    // 点到线段距离
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx*dx + dy*dy;
+    let t = len2 === 0 ? 0 : ((0-ax)*dx + (0-ay)*dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const cx = ax + t*dx, cy = ay + t*dy;
+    const d = Math.sqrt(cx*cx + cy*cy);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}function markOffline() {
   const now = new Date();
   document.getElementById('lastUpdate').textContent = now.toTimeString().slice(0, 8);
   document.getElementById('statusDot').className = 'offline';
@@ -291,8 +336,9 @@ function renderFence() {
   if (count >= 3) {
     L.polygon(fenceVerts, { color:'#ef4444', weight:2.5, fillColor:'#ef4444', fillOpacity:.15 }).addTo(fenceLayer);
     const s = document.getElementById('fenceStatus');
-    s.className = lastState.inFence ? 'in' : 'out';
-    s.textContent = lastState.inFence ? '🚨 设备在围栏内!' : '✅ 设备在围栏外';
+    const inF = localInFence();   // 本地重算, 不依赖云端延迟字段
+    s.className = inF ? 'in' : 'out';
+    s.textContent = inF ? '🚨 设备在围栏内!' : '✅ 设备在围栏外';
   } else {
     document.getElementById('fenceStatus').className = 'nofence';
     document.getElementById('fenceStatus').textContent = '未设置围栏';
@@ -310,6 +356,11 @@ function updateUI() {
     ? `纬度 ${lastState.lat.toFixed(6)}<br>经度 ${lastState.lon.toFixed(6)}<br>卫星 ${lastState.sats} 颗`
     : '等待定位…';
   document.getElementById('distInfo').textContent = lastState.dist > 0 ? lastState.dist.toFixed(1) + ' 米' : '--';
+  // 有本地围栏时用本地计算的距离 (画新围栏后立即准确), 否则用设备上报值
+  if (fenceVerts.length >= 3 && lastState.lat) {
+    const d = distToFence(lastState.lat, lastState.lon, fenceVerts);
+    if (d !== null) document.getElementById('distInfo').textContent = d.toFixed(1) + ' 米';
+  }
   if (online && lastState.lat !== 0) {
     deviceMarker.setLatLng([lastState.lat, lastState.lon]);
     map.setView([lastState.lat, lastState.lon], map.getZoom());
@@ -319,7 +370,7 @@ function updateUI() {
 }
 function updateAlert() {
   const b = document.getElementById('alertBanner');
-  if (lastState.inFence && fenceVerts.length >= 3) b.classList.add('show');
+  if (localInFence() && fenceVerts.length >= 3) b.classList.add('show');
   else b.classList.remove('show');
 }
 function toast(msg) {
