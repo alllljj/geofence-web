@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>电子围栏 · 远程监控</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root { --bg:#0f1520; --card:#1a2332; --line:#2a3648; --text:#e8eef7; --dim:#8aa0b8; --green:#22c55e; --red:#ef4444; --blue:#3b82f6; --amber:#f59e0b; }
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; min-height:100vh; }
+header { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); background:var(--card); position:sticky; top:0; z-index:1000; }
+header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; gap:8px; }
+#statusDot { width:10px; height:10px; border-radius:50%; background:var(--dim); display:inline-block; transition:all .3s; }
+#statusDot.online { background:var(--green); box-shadow:0 0 8px var(--green); }
+#statusDot.offline { background:var(--red); box-shadow:0 0 8px var(--red); }
+#map { height:52vh; width:100%; background:#0d1520; z-index:1; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; margin:12px; padding:14px; }
+.row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; }
+.row + .row { border-top:1px solid var(--line); }
+.label { color:var(--dim); font-size:13px; }
+.value { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; }
+#posInfo { font-size:13px; color:var(--dim); line-height:1.7; }
+#fenceStatus { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-size:14px; font-weight:600; }
+#fenceStatus.in { background:rgba(239,68,68,.15); color:var(--red); }
+#fenceStatus.out { background:rgba(34,197,94,.12); color:var(--green); }
+#fenceStatus.nofence { background:rgba(139,160,184,.12); color:var(--dim); }
+.alert-banner { display:none; background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.4); color:var(--red); text-align:center; padding:10px; font-weight:700; font-size:15px; border-radius:10px; margin:12px; animation:pulse 1.2s infinite; }
+.alert-banner.show { display:block; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.55} }
+.btn { display:block; width:100%; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:600; cursor:pointer; color:#fff; transition:opacity .2s, transform .1s; }
+.btn:active { transform:scale(.97); }
+.btn-primary { background:var(--blue); }
+.btn-danger { background:var(--red); }
+.btn-ghost { background:var(--line); color:var(--text); }
+.btn:disabled { opacity:.4; cursor:not-allowed; }
+.hint { font-size:12px; color:var(--dim); margin-top:8px; line-height:1.6; }
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px); background:#fff; color:#111; padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600; transition:transform .3s; z-index:2000; box-shadow:0 4px 20px rgba(0,0,0,.4); }
+#toast.show { transform:translateX(-50%) translateY(0); }
+.mode-bar { display:flex; gap:8px; margin-bottom:10px; }
+.mode-btn { flex:1; padding:8px; border:1px solid var(--line); background:transparent; color:var(--dim); border-radius:8px; font-size:13px; cursor:pointer; }
+.mode-btn.active { background:var(--blue); border-color:var(--blue); color:#fff; }
+.coord-input { width:100%; padding:9px 10px; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:8px; font-size:13px; margin-top:8px; font-family:monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span id="statusDot"></span> 电子围栏 · 远程监控</h1>
+  <span style="font-size:12px;color:var(--dim)" id="lastUpdate">--:--:--</span>
+</header>
+
+<div class="alert-banner" id="alertBanner">🚨 设备已进入危险区！</div>
+
+<div id="map"></div>
+
+<div class="card">
+  <div class="row">
+    <span class="label">设备状态</span>
+    <span class="value" id="devOnline">检测中…</span>
+  </div>
+  <div class="row">
+    <span class="label">围栏状态</span>
+    <span id="fenceStatus" class="nofence">未设置围栏</span>
+  </div>
+  <div class="row">
+    <span class="label">当前位置</span>
+    <span class="value" id="posInfo">等待定位…</span>
+  </div>
+  <div class="row">
+    <span class="label">距围栏边缘</span>
+    <span class="value" id="distInfo">--</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="mode-bar">
+    <button class="mode-btn" id="modeDraw" onclick="setMode('draw')">✏️ 画围栏</button>
+    <button class="mode-btn" id="modeEdit" onclick="setMode('edit')">📋 手动输入</button>
+    <button class="mode-btn" id="modeView" onclick="setMode('view')">👁 查看</button>
+  </div>
+  <div id="manualBox" style="display:none">
+    <input class="coord-input" id="manualCoords" placeholder="示例: 39.7961,116.3940;39.7965,116.3940;39.7965,116.3945;39.7961,116.3945" />
+    <div class="hint">格式：纬度,经度;纬度,经度;… （至少 3 个点，分号分隔）</div>
+    <button class="btn btn-primary" style="margin-top:10px" onclick="sendManualFence()">下发围栏</button>
+  </div>
+  <div id="drawBox" style="display:none">
+    <div class="hint">在地图上依次点击添加顶点，画完点击「完成」下发。点击「撤销」删除最后一点。</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-ghost" onclick="undoPoint()">↩️ 撤销</button>
+      <button class="btn btn-primary" onclick="finishDraw()">✅ 完成下发</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-danger" onclick="clearFence()">🗑 清除围栏</button>
+    </div>
+  </div>
+  <div id="viewBox" class="hint" style="margin-top:0">
+    当前围栏：<span id="fenceCount">0</span> 个顶点
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-danger" onclick="clearFence()">🗑 清除围栏</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ================= 配置 =================
+// ⚠️ 部署前修改: 你的巴法云 UID 和主题
+const BEMFA_UID = '050042db7c93475090e07b207e55d01a';
+const TOPIC = 'geofence001';
+const API = 'https://apis.bemfa.com/va';
+// 设备位置由 GitHub Actions 中转写入 position.json
+const POS_URL = 'position.json';
+
+// ================= 状态 =================
+let mode = 'view';
+let map, deviceMarker, fenceLayer, tempLayer;
+let drawing = [];        // 画点中的临时顶点
+let fenceVerts = [];     // 当前围栏
+let lastState = { lat:null, lon:null, sats:0, inFence:false, dist:0 };
+
+// ================= 初始化 =================
+function init() {
+  map = L.map('map', { zoomControl:false }).setView([39.796, 116.401], 15);
+  L.control.zoom({ position:'bottomright' }).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap', maxZoom:19
+  }).addTo(map);
+
+  deviceMarker = L.marker([39.796,116.401], {
+    icon: L.divIcon({ html:'<div style="width:14px;height:14px;background:#3b82f6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 10px #3b82f6"></div>', className:'', iconSize:[20,20], iconAnchor:[10,10] })
+  }).addTo(map);
+  fenceLayer = L.layerGroup().addTo(map);
+  tempLayer = L.layerGroup().addTo(map);
+
+  map.on('click', onMapClick);
+  loadPosition();
+  setInterval(loadPosition, 10000);  // 10 秒轮询
+  loadFence();
+  setInterval(loadFence, 30000);
+}
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode' + m[0].toUpperCase() + m.slice(1)).classList.add('active');
+  document.getElementById('manualBox').style.display = m==='edit' ? 'block' : 'none';
+  document.getElementById('drawBox').style.display = m==='draw' ? 'block' : 'none';
+  document.getElementById('viewBox').style.display = m==='view' ? 'block' : 'none';
+  if (m==='draw' && drawing.length===0) toast('在地图上点击添加围栏顶点');
+  if (m!=='draw') { drawing=[]; renderTemp(); }
+}
+function onMapClick(e) {
+  if (mode !== 'draw') return;
+  drawing.push([e.latlng.lat, e.latlng.lng]);
+  renderTemp();
+}
+function renderTemp() {
+  tempLayer.clearLayers();
+  drawing.forEach((p,i) => {
+    L.circleMarker(p, { radius:5, color:'#f59e0b', fillColor:'#f59e0b', fillOpacity:1 }).addTo(tempLayer);
+    if (i>0) L.polyline([drawing[i-1], p], { color:'#f59e0b', weight:2, dashArray:'4,4' }).addTo(tempLayer);
+  });
+  if (drawing.length>2) L.polygon(drawing, { color:'#f59e0b', weight:2, fillOpacity:.15 }).addTo(tempLayer);
+}
+function undoPoint() { if (drawing.length) { drawing.pop(); renderTemp(); } }
+function finishDraw() {
+  if (drawing.length < 3) { toast('至少需要 3 个顶点'); return; }
+  const body = drawing.map(p => p[0].toFixed(6) + ',' + p[1].toFixed(6)).join(';');
+  sendFence(body);
+}
+function sendManualFence() {
+  const v = document.getElementById('manualCoords').value.trim();
+  if (!v) { toast('请输入坐标'); return; }
+  sendFence(v);
+}
+function sendFence(body) {
+  if (!/^[0-9.\-,\s;]+$/.test(body)) { toast('坐标格式不正确'); return; }
+  const url = API + '/sendMessage?uid=' + BEMFA_UID + '&topic=' + TOPIC + '&type=3&msg=' + encodeURIComponent('FENCE:' + body);
+  fetch(url).then(r => r.json()).then(j => {
+    if (j.code === 0) {
+      toast('✅ 围栏已下发');
+      // 本地保存围栏顶点用于显示
+      const verts = body.split(';').map(p => { const c = p.split(','); return [parseFloat(c[0]), parseFloat(c[1])]; });
+      saveFence(verts);
+      drawing = []; renderTemp(); setMode('view');
+    }
+    else toast('下发失败: ' + j.message);
+  }).catch(() => toast('网络错误'));
+}
+function clearFence() {
+  if (!confirm('确认清除围栏？')) return;
+  const url = API + '/sendMessage?uid=' + BEMFA_UID + '&topic=' + TOPIC + '&type=3&msg=' + encodeURIComponent('CLEAR');
+  fetch(url).then(r => r.json()).then(j => {
+    if (j.code === 0) { toast('✅ 围栏已清除'); saveFence([]); }
+    else toast('清除失败: ' + j.message);
+  }).catch(() => toast('网络错误'));
+}
+
+// ================= 位置轮询 =================
+function loadPosition() {
+  fetch(POS_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
+    const p = d.position || d;
+    lastState = {
+      lat: parseFloat(p.lat), lon: parseFloat(p.lon),
+      sats: parseInt(p.sats) || 0,
+      inFence: (p.inFence === true || p.inFence === '1' || p.inFence === 1),
+      dist: parseFloat(p.dist) || 0
+    };
+    updateUI();
+  }).catch(() => { /* position.json 可能还没生成 */ });
+}
+// 围栏用 localStorage 持久化 (自己下发的自己存)
+function loadFence() {
+  try {
+    const v = JSON.parse(localStorage.getItem('geofence_verts') || '[]');
+    fenceVerts = Array.isArray(v) ? v : [];
+  } catch(e) { fenceVerts = []; }
+  renderFence();
+}
+function saveFence(verts) {
+  fenceVerts = verts;
+  try { localStorage.setItem('geofence_verts', JSON.stringify(verts)); } catch(e) {}
+  renderFence();
+}
+function renderFence() {
+  fenceLayer.clearLayers();
+  const count = fenceVerts.length;
+  document.getElementById('fenceCount').textContent = count;
+  if (count >= 3) {
+    L.polygon(fenceVerts, { color:'#ef4444', weight:2.5, fillColor:'#ef4444', fillOpacity:.15 }).addTo(fenceLayer);
+    const s = document.getElementById('fenceStatus');
+    s.className = lastState.inFence ? 'in' : 'out';
+    s.textContent = lastState.inFence ? '🚨 设备在围栏内!' : '✅ 设备在围栏外';
+  } else {
+    document.getElementById('fenceStatus').className = 'nofence';
+    document.getElementById('fenceStatus').textContent = '未设置围栏';
+  }
+  updateAlert();
+}
+function updateUI() {
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent = now.toTimeString().slice(0,8);
+  const online = lastState.lat !== null && lastState.lat !== 0;
+  const dot = document.getElementById('statusDot');
+  dot.className = online ? 'online' : 'offline';
+  document.getElementById('devOnline').textContent = online ? '🟢 在线' : '🔴 离线';
+  document.getElementById('posInfo').innerHTML = online
+    ? `纬度 ${lastState.lat.toFixed(6)}<br>经度 ${lastState.lon.toFixed(6)}<br>卫星 ${lastState.sats} 颗`
+    : '等待定位…';
+  document.getElementById('distInfo').textContent = lastState.dist > 0 ? lastState.dist.toFixed(1) + ' 米' : '--';
+  if (online && lastState.lat !== 0) {
+    deviceMarker.setLatLng([lastState.lat, lastState.lon]);
+    map.setView([lastState.lat, lastState.lon], map.getZoom());
+  }
+  renderFence();
+  updateAlert();
+}
+function updateAlert() {
+  const b = document.getElementById('alertBanner');
+  if (lastState.inFence && fenceVerts.length >= 3) b.classList.add('show');
+  else b.classList.remove('show');
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>

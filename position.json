@@ -1,0 +1,10 @@
+{
+  "position": {
+    "lat": 0,
+    "lon": 0,
+    "sats": 0,
+    "inFence": false,
+    "dist": 0,
+    "ts": 0
+  }
+}

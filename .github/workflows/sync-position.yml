@@ -1,0 +1,76 @@
+name: Sync device position
+
+on:
+  schedule:
+    - cron: '*/2 * * * *'   # 每 2 分钟拉取一次设备坐标
+  workflow_dispatch:        # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull latest device position from Bemfa
+        env:
+          BEMFA_UID: ${{ secrets.BEMFA_UID }}
+          TOPIC: ${{ secrets.BEMFA_TOPIC }}
+        run: |
+          python3 - <<'EOF'
+          import socket, json, os, time
+
+          UID = os.environ.get('BEMFA_UID', '')
+          TOPIC = os.environ.get('BEMFA_TOPIC', 'geofence001')
+          out = {"position": {"lat": 0, "lon": 0, "sats": 0, "inFence": False, "dist": 0, "ts": 0}}
+
+          try:
+              s = socket.create_connection(('bemfa.com', 8344), timeout=10)
+              s.settimeout(8)
+              # cmd=3: 订阅并获取一次已推送的消息 (设备最新上报)
+              s.sendall(('cmd=3&uid=%s&topic=%s\r\n' % (UID, TOPIC)).encode())
+              buf = b''
+              try:
+                  while True:
+                      chunk = s.recv(4096)
+                      if not chunk: break
+                      buf += chunk
+                      if b'\n' in buf or len(buf) > 2048: break
+              except socket.timeout:
+                  pass
+              s.close()
+              txt = buf.decode('utf-8', errors='replace')
+
+              # 解析 msg= 字段 (设备格式: lat,lon,sats,inFence,dist)
+              import re
+              m = re.search(r'msg=([^,\r\n]+),([^,\r\n]+),(\d+),(\d+),([0-9.]+)', txt)
+              if m:
+                  lat, lon = float(m.group(1)), float(m.group(2))
+                  if abs(lat) > 0.0001 or abs(lon) > 0.0001:
+                      out["position"] = {
+                          "lat": lat, "lon": lon,
+                          "sats": int(m.group(3)),
+                          "inFence": m.group(4) == "1",
+                          "dist": float(m.group(5)),
+                          "ts": int(time.time())
+                      }
+          except Exception as e:
+              out["error"] = str(e)
+
+          with open('position.json', 'w', encoding='utf-8') as f:
+              json.dump(out, f, ensure_ascii=False)
+          print(json.dumps(out, ensure_ascii=False))
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "geofence-bot"
+          git config user.email "geofence-bot@users.noreply.github.com"
+          git add position.json
+          git diff --cached --quiet && echo "no change" || {
+            git commit -m "sync position $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          }
