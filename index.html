@@ -111,7 +111,10 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
 const BEMFA_UID = '050042db7c93475090e07b207e55d01a';
 const TOPIC = 'geofence001';
 const API = 'https://apis.bemfa.com/va';
-// 设备位置由 GitHub Actions 中转写入 position.json
+// 位置数据源:
+//   优先级1: Cloudflare Worker (需自行部署 worker.js, 把这里改成你的 Worker 地址)
+//   优先级2: 本地中转脚本写入的 position.json (GitHub Pages 同目录)
+const WORKER_URL = '';   // ⚠️ 填入你的 Cloudflare Worker 地址 (如 https://geofence-relay.xxx.workers.dev), 留空则用 position.json
 const POS_URL = 'position.json';
 
 // ================= 状态 =================
@@ -177,39 +180,81 @@ function sendManualFence() {
 }
 function sendFence(body) {
   if (!/^[0-9.\-,\s;]+$/.test(body)) { toast('坐标格式不正确'); return; }
-  const url = API + '/sendMessage?uid=' + BEMFA_UID + '&topic=' + TOPIC + '&type=3&msg=' + encodeURIComponent('FENCE:' + body);
+  const cmd = 'FENCE:' + body;
+  // 优先走 Worker 下发
+  if (WORKER_URL) {
+    fetch(WORKER_URL + '/fence', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd })
+    }).then(r => r.json()).then(j => {
+      if (j.ok) onFenceSent(body);
+      else toast('下发失败: ' + (j.err || 'unknown'));
+    }).catch(() => sendFenceHttp(cmd));
+  } else {
+    sendFenceHttp(cmd);
+  }
+}
+function sendFenceHttp(cmd) {
+  const url = API + '/sendMessage?uid=' + BEMFA_UID + '&topic=' + TOPIC + '&type=3&msg=' + encodeURIComponent(cmd);
   fetch(url).then(r => r.json()).then(j => {
-    if (j.code === 0) {
-      toast('✅ 围栏已下发');
-      // 本地保存围栏顶点用于显示
-      const verts = body.split(';').map(p => { const c = p.split(','); return [parseFloat(c[0]), parseFloat(c[1])]; });
-      saveFence(verts);
-      drawing = []; renderTemp(); setMode('view');
-    }
+    if (j.code === 0) onFenceSent(cmd.replace('FENCE:', ''));
     else toast('下发失败: ' + j.message);
   }).catch(() => toast('网络错误'));
 }
+function onFenceSent(body) {
+  toast('✅ 围栏已下发');
+  const verts = body.split(';').map(p => { const c = p.split(','); return [parseFloat(c[0]), parseFloat(c[1])]; });
+  saveFence(verts);
+  drawing = []; renderTemp(); setMode('view');
+}
 function clearFence() {
   if (!confirm('确认清除围栏？')) return;
+  const cmd = 'CLEAR';
+  if (WORKER_URL) {
+    fetch(WORKER_URL + '/fence', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd })
+    }).then(r => r.json()).then(j => { if (j.ok) onFenceCleared(); else toast('清除失败'); })
+    .catch(() => clearFenceHttp());
+  } else clearFenceHttp();
+}
+function clearFenceHttp() {
   const url = API + '/sendMessage?uid=' + BEMFA_UID + '&topic=' + TOPIC + '&type=3&msg=' + encodeURIComponent('CLEAR');
   fetch(url).then(r => r.json()).then(j => {
-    if (j.code === 0) { toast('✅ 围栏已清除'); saveFence([]); }
+    if (j.code === 0) onFenceCleared();
     else toast('清除失败: ' + j.message);
   }).catch(() => toast('网络错误'));
 }
+function onFenceCleared() { toast('✅ 围栏已清除'); saveFence([]); }
 
 // ================= 位置轮询 =================
 function loadPosition() {
-  fetch(POS_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
-    const p = d.position || d;
-    lastState = {
-      lat: parseFloat(p.lat), lon: parseFloat(p.lon),
-      sats: parseInt(p.sats) || 0,
-      inFence: (p.inFence === true || p.inFence === '1' || p.inFence === 1),
-      dist: parseFloat(p.dist) || 0
-    };
-    updateUI();
-  }).catch(() => { /* position.json 可能还没生成 */ });
+  const tryWorker = WORKER_URL ? fetch(WORKER_URL + '/position?t=' + Date.now()).then(r => r.json()).then(d => d.position || null).catch(() => null) : Promise.resolve(null);
+  tryWorker.then(pos => {
+    if (pos && (pos.lat !== 0 || pos.lon !== 0)) { applyPosition(pos); return; }
+    // 回退: position.json (本地中转写入)
+    fetch(POS_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
+      const p = d.position || d;
+      if (p.lat !== 0 || p.lon !== 0) applyPosition(p);
+      else markOffline();
+    }).catch(() => markOffline());
+  });
+}
+function applyPosition(p) {
+  lastState = {
+    lat: parseFloat(p.lat), lon: parseFloat(p.lon),
+    sats: parseInt(p.sats) || 0,
+    inFence: (p.inFence === true || p.inFence === '1' || p.inFence === 1),
+    dist: parseFloat(p.dist) || 0
+  };
+  updateUI();
+}
+function markOffline() {
+  const now = new Date();
+  document.getElementById('lastUpdate').textContent = now.toTimeString().slice(0, 8);
+  document.getElementById('statusDot').className = 'offline';
+  document.getElementById('devOnline').textContent = '🔴 离线/等待数据';
+  document.getElementById('posInfo').textContent = '等待定位…';
 }
 // 围栏用 localStorage 持久化 (自己下发的自己存)
 function loadFence() {
