@@ -98,7 +98,7 @@ jobs:
               sos_lat, sos_lon = float(sos_hits[-1][0]), float(sos_hits[-1][1])
               # 去重: 5 分钟内已记录过同一次求救(可能已被电脑端 sos_watch 记录)则不重复发信
               if now - last_sos_ts > 300:
-                  evs.append({"ts": now, "type": "SOS", "lat": sos_lat, "lon": sos_lon, "src": "actions"})
+                  evs.append({"ts": now, "type": "SOS", "lat": sos_lat, "lon": sos_lon, "src": "actions", "devId": DEVID})
                   fire = True
                   print("SOS detected! lat=%.6f lon=%.6f -> 触发报警邮件" % (sos_lat, sos_lon))
               else:
@@ -106,7 +106,7 @@ jobs:
               ev['sos'] = True
               out['position']['sos'] = True
           elif safe_hit and ev.get('sos'):
-              evs.append({"ts": now, "type": "SAFE", "lat": 0, "lon": 0, "src": "actions"})
+              evs.append({"ts": now, "type": "SAFE", "lat": 0, "lon": 0, "src": "actions", "devId": DEVID})
               ev['sos'] = False
               print("SAFE received -> 解除报警状态")
 

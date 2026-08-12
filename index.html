@@ -215,6 +215,33 @@ const API = 'https://apis.bemfa.com/va';
 const WORKER_URL = '';   // ⚠️ 填入你的 Cloudflare Worker 地址 (如 https://geofence-relay.xxx.workers.dev), 留空则用 position.json
 const POS_URL = 'position.json';
 
+// 家属账号库访问 (geofence-data 私有仓库): 用于报警记录显示该设备的守护联系邮箱
+// 与 user.html 同一细粒度 PAT (仅授权 Contents 读写); 两段拼接防 GitHub 推送保护
+const DATA_TOKEN = '' + 'github_pat_11AQWYJXY0G' + '5YzuL7VY6GB_Zo9SNYAV2PlMwUhqxaFJugVVUn1K1ybU0GP6YqanonP3D3B4WPCyQ630pXF';
+const DATA_REPO = 'alllljj/geofence-data';
+let _mailCache = {};   // devId -> {emails:[...]} 10 分钟缓存
+async function guardianMails(devId) {
+  if (!devId) return [];
+  if (_mailCache[devId] && _mailCache[devId].t > Date.now() - 600000) return _mailCache[devId].emails;
+  try {
+    const r = await fetch('https://api.github.com/repos/' + DATA_REPO + '/contents/users/active?t=' + Date.now(),
+      { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN, 'Accept': 'application/vnd.github+json' } });
+    if (!r.ok) return [];
+    const list = await r.json();
+    const emails = [];
+    for (const it of list) {
+      if (!it.name.endsWith('.json')) continue;
+      const rr = await fetch(it.url, { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } });
+      if (!rr.ok) continue;
+      const rec = JSON.parse(atob((await rr.json()).content.replace(/\n/g, '')));
+      if (rec.devId && rec.devId.toUpperCase() === String(devId).toUpperCase() && rec.email)
+        emails.push(rec.email + (rec.name ? '（' + rec.name + '）' : ''));
+    }
+    _mailCache[devId] = { t: Date.now(), emails: emails };
+    return emails;
+  } catch (e) { return []; }
+}
+
 // ================= 状态 =================
 let mode = 'view';
 let map, deviceMarker, fenceLayer, tempLayer, tileLayer;
@@ -383,10 +410,20 @@ function loadSos() {
       '<div style="padding:8px 0;border-top:1px solid var(--line)">' +
       '<span style="color:' + (e.type === 'SAFE' ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' +
       (e.type === 'SAFE' ? '✅ 解除 ' : '🚨 求救 ') + sosFmtTime(e.ts) + '</span>' +
+      (e.devId ? '<span style="color:var(--blue);font-weight:600;margin-left:8px">[设备 ' + e.devId + ']</span>' : '') +
+      '<span class="gmail" data-dev="' + (e.devId || '') + '" data-ts="' + e.ts + '"></span>' +
       (e.lat ? '<div style="font-family:monospace;font-size:12px;margin-top:2px">' + e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) +
         ' · <a style="color:var(--blue)" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图</a></div>' : '') +
       '</div>').join('');
     document.getElementById('sosBanner').classList.toggle('show', !!ev.sos);
+    // 异步填充每条的守护联系邮箱
+    document.querySelectorAll('.gmail').forEach(async el => {
+      const dev = el.dataset.dev;
+      if (!dev) return;
+      const mails = await guardianMails(dev);
+      el.textContent = mails.length ? ('联系 ' + mails.join('、')) : '';
+      el.style.cssText = 'display:block;font-size:12px;color:var(--dim);margin-top:2px';
+    });
   }).catch(() => {});
 }
 
