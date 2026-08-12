@@ -1,6 +1,6 @@
 {
  "sos": true,
- "updated": 1786575291,
+ "updated": 1786553864,
  "events": [
   {
    "ts": 1786574783,
@@ -14,6 +14,13 @@
    "type": "SOS",
    "lat": 39.908,
    "lon": 116.397,
+   "src": "actions"
+  },
+  {
+   "ts": 1786553864,
+   "type": "SOS",
+   "lat": 0.0,
+   "lon": 0.0,
    "src": "actions"
   }
  ]
