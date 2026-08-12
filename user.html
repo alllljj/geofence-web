@@ -459,7 +459,7 @@ async function refresh() {
         .bindTooltip('🚨 ' + fmtTime(e.ts) + (tip ? ' · ' + tip : '')).addTo(evLayer);
     });
 
-    const danger = !!ev.sos;
+    const danger = !!(ev.sos || (ev.position && ev.position.sos) || list.some(e => e.type === 'SOS' && !list.find(x => x.type === 'SAFE' && x.ts > e.ts)));
     const latest = list.find(e => e.type !== 'SAFE');
     setStatus(danger, danger
       ? (latest ? '求救信号于 ' + fmtTime(latest.ts) + ' 触发，请立即联系！' : '设备发出求救信号！')
