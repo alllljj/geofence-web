@@ -386,17 +386,22 @@ async function refresh() {
     document.getElementById('evCount').textContent = list.length + ' 条';
     const box = document.getElementById('evList');
     if (!list.length) box.textContent = '暂无报警记录';
-    else box.innerHTML = list.slice(0, 20).map(e =>
-      '<div class="ev"><div class="t">🚨 ' + fmtTime(e.ts) + (e.type === 'SAFE' ? '（已解除）' : '') + '</div>' +
-      '<div class="a">' + (e.addr || '危险求救信号') + '</div>' +
+    else box.innerHTML = await Promise.all(list.slice(0, 20).map(async e => {
+      let addr = e.addr || '';
+      if (!addr && e.lat) addr = await reverseGeo(e.lat, e.lon);
+      if (!addr) addr = '危险求救信号';
+      return '<div class="ev"><div class="t">🚨 ' + fmtTime(e.ts) + (e.type === 'SAFE' ? '（已解除）' : '') + '</div>' +
+        '<div class="a">' + addr + '</div>' +
       '<div class="c">' + (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '无定位数据') +
       (e.lat ? ' · <a class="link" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图查看</a>' : '') +
-      '</div></div>').join('');
+        '</div></div>';
+    }));
 
     evLayer.clearLayers();
     list.filter(e => e.type !== 'SAFE' && e.lat).slice(0, 10).forEach(e => {
+      const tip = (e.addr || (e.lat + ',' + e.lon));
       L.circleMarker([e.lat, e.lon], { radius: 7, color: '#ef4444', fillColor: '#ef4444', fillOpacity: .75, weight: 2 })
-        .bindTooltip('🚨 ' + fmtTime(e.ts)).addTo(evLayer);
+        .bindTooltip('🚨 ' + fmtTime(e.ts) + (tip ? ' · ' + tip : '')).addTo(evLayer);
     });
 
     const danger = !!ev.sos;
