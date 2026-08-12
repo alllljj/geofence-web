@@ -1,11 +1,11 @@
 {
  "position": {
-  "lat": 39.797517,
-  "lon": 116.400327,
+  "lat": 39.812345,
+  "lon": 116.412345,
   "sats": 15,
   "inFence": false,
   "dist": 253.8,
-  "ts": 1786546403,
+  "ts": 1786550863,
   "sos": true
  },
  "events": [
@@ -22,7 +22,16 @@
    "lat": 39.908,
    "lon": 116.397,
    "src": "actions"
+  },
+  {
+   "ts": 1786550863,
+   "type": "SOS",
+   "lat": 39.812345,
+   "lon": 116.412345,
+   "src": "pc",
+   "devId": "GEOFENCE001"
   }
  ],
- "updated": 1786549761
+ "updated": 1786550863,
+ "sos": true
 }
