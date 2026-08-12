@@ -127,6 +127,14 @@ jobs:
               except Exception as e:
                   print("KEEP failed:", e)
 
+          # 合并历史 events: 保留之前电脑端 sos_watch 写入的事件记录
+          try:
+              old_state = json.load(open('devices/%s/state.json', encoding='utf-8'))
+              if old_state.get('events'):
+                  out['events'] = old_state['events']
+              out['updated'] = old_state.get('updated', now)
+          except Exception:
+              pass
           with open('devices/%s/state.json' % DEVID, 'w', encoding='utf-8') as f:
               json.dump(out, f, ensure_ascii=False)
 
@@ -136,7 +144,7 @@ jobs:
               f.write("lat=%.6f\n" % sos_lat)
               f.write("lon=%.6f\n" % sos_lon)
               f.write("ts=%d\n" % now)
-          f.write("devid=%s\n" % DEVID)
+              f.write("devid=%s\n" % DEVID)
           EOF
 
       - name: Commit and push
