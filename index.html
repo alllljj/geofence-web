@@ -72,6 +72,10 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
     <input class="coord-input" id="loginPass" type="password" placeholder="密码" autocomplete="current-password" style="margin-top:10px" />
     <button class="btn btn-primary" style="margin-top:16px" onclick="doLogin()">登 录</button>
     <div class="hint" style="text-align:center" id="loginErr"></div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+      <a href="user.html" style="color:var(--blue);font-size:13px;text-decoration:none">🛡️ 家属入口 · 邮箱注册 / 登录 →</a>
+      <div class="hint" style="text-align:center;margin-top:4px">普通用户仅可查看定位与安全状态</div>
+    </div>
   </div>
 </div>
 
@@ -84,6 +88,7 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
 </header>
 
 <div class="alert-banner" id="alertBanner">🚨 设备已进入危险区！</div>
+<div class="alert-banner" id="sosBanner" style="background:rgba(239,68,68,.3);border-color:var(--red);font-size:17px">🆘 收到求救信号！请立即联系！</div>
 
 <div id="map"></div>
 
@@ -145,6 +150,14 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
       <button class="btn btn-danger" onclick="clearFence()">🗑 清除围栏</button>
     </div>
   </div>
+</div>
+
+<div class="card">
+  <div class="row" style="border:none;padding-bottom:2px">
+    <span class="label">🚨 危险报警记录（求救开关）</span>
+    <span class="label" id="evCount">0 条</span>
+  </div>
+  <div id="evList" class="hint" style="margin-top:6px">暂无报警记录</div>
 </div>
 
 <div id="toast"></div>
@@ -223,6 +236,8 @@ function init() {
   map.on('click', onMapClick);
   loadPosition();
   setInterval(loadPosition, 10000);  // 10 秒轮询
+  loadSos();
+  setInterval(loadSos, 10000);       // SOS 求救信号 10 秒轮询
   loadFence();
   setInterval(loadFence, 30000);
   refreshCam();
@@ -352,6 +367,28 @@ function clearFenceHttp() {
   }).catch(() => toast('网络错误'));
 }
 function onFenceCleared() { toast('✅ 围栏已清除'); saveFence([]); }
+
+// ================= SOS 求救信号 =================
+function sosFmtTime(ts) {
+  const d = new Date(ts * 1000), p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+function loadSos() {
+  fetch('events.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).then(ev => {
+    const list = (ev.events || []).slice().sort((a, b) => b.ts - a.ts);
+    document.getElementById('evCount').textContent = list.length + ' 条';
+    const box = document.getElementById('evList');
+    if (!list.length) box.textContent = '暂无报警记录';
+    else box.innerHTML = list.slice(0, 15).map(e =>
+      '<div style="padding:8px 0;border-top:1px solid var(--line)">' +
+      '<span style="color:' + (e.type === 'SAFE' ? 'var(--green)' : 'var(--red)') + ';font-weight:700">' +
+      (e.type === 'SAFE' ? '✅ 解除 ' : '🚨 求救 ') + sosFmtTime(e.ts) + '</span>' +
+      (e.lat ? '<div style="font-family:monospace;font-size:12px;margin-top:2px">' + e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) +
+        ' · <a style="color:var(--blue)" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图</a></div>' : '') +
+      '</div>').join('');
+    document.getElementById('sosBanner').classList.toggle('show', !!ev.sos);
+  }).catch(() => {});
+}
 
 // ================= 位置轮询 =================
 function loadPosition() {
