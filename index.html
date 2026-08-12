@@ -88,7 +88,6 @@ header h1 { font-size:17px; font-weight:600; display:flex; align-items:center; g
 </header>
 
 <div class="alert-banner" id="alertBanner">🚨 设备已进入危险区！</div>
-<div class="alert-banner" id="sosBanner" style="background:rgba(239,68,68,.3);border-color:var(--red);font-size:17px">🆘 收到求救信号！请立即联系！</div>
 
 <div id="map"></div>
 
@@ -415,7 +414,6 @@ function loadSos() {
       (e.lat ? '<div style="font-family:monospace;font-size:12px;margin-top:2px">' + e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) +
         ' · <a style="color:var(--blue)" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图</a></div>' : '') +
       '</div>').join('');
-    document.getElementById('sosBanner').classList.toggle('show', !!ev.sos);
     // 异步填充每条的守护联系邮箱
     document.querySelectorAll('.gmail').forEach(async el => {
       const dev = el.dataset.dev;
