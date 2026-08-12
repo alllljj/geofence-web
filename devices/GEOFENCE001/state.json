@@ -5,7 +5,7 @@
   "sats": 15,
   "inFence": false,
   "dist": 253.8,
-  "ts": 1786551137,
+  "ts": 1786551275,
   "sos": true
  },
  "events": [
@@ -46,8 +46,16 @@
    "lon": 116.412345,
    "src": "pc",
    "devId": "GEOFENCE001"
+  },
+  {
+   "ts": 1786551275,
+   "type": "SOS",
+   "lat": 39.812345,
+   "lon": 116.412345,
+   "src": "pc",
+   "devId": "GEOFENCE001"
   }
  ],
- "updated": 1786551137,
+ "updated": 1786551275,
  "sos": true
 }
