@@ -1,1 +1,20 @@
-{"sos": true, "updated": 1786546403, "events": [{"ts": 1786574783, "type": "SOS", "lat": 39.792, "lon": 116.391, "src": "actions"}]}
+{
+ "sos": true,
+ "updated": 1786575291,
+ "events": [
+  {
+   "ts": 1786574783,
+   "type": "SOS",
+   "lat": 39.792,
+   "lon": 116.391,
+   "src": "actions"
+  },
+  {
+   "ts": 1786575291,
+   "type": "SOS",
+   "lat": 39.908,
+   "lon": 116.397,
+   "src": "actions"
+  }
+ ]
+}
