@@ -334,7 +334,7 @@ async function doLogin() {
     }
     const h = await sha256hex(email + ':' + pass + ':' + SALT);
     if (h !== act.data.pwd) { msg('密码错误', 'err'); btn.disabled = false; return; }
-    localStorage.setItem('gf_user', JSON.stringify({ uid: uid, email: email, name: act.data.name, t: Date.now() }));
+    localStorage.setItem('gf_user', JSON.stringify({ uid: uid, email: email, name: act.data.name, devId: act.data.devId || '', t: Date.now() }));
     enterDashboard();
   } catch (e) { msg('登录失败：' + e.message, 'err'); }
   btn.disabled = false;
@@ -415,8 +415,10 @@ async function refresh() {
   // 1) 位置
   try {
     const DID = (window.__gfUser && window.__gfUser.devId) || DEV_ID;
-  const posUrl = 'devices/' + DID + '/state.json';
-  const pos = (await (await fetch(posUrl + '?t=' + Date.now(), { cache: 'no-store' })).json()).position || {};
+  const posUrl = 'https://api.github.com/repos/alllljj/geofence-web/contents/devices/' + DID + '/state.json';
+  const raw1 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
+  const posDoc = raw1.content ? JSON.parse(atob(raw1.content.replace(/\n/g, ''))) : raw1;
+  const pos = (posDoc && posDoc.position) || {};
     const age = pos.ts ? (Date.now() / 1000 - pos.ts) : 1e9;
     const online = age < 600;
     document.getElementById('statusDot').className = online ? 'online' : 'offline';
@@ -433,7 +435,8 @@ async function refresh() {
 
   // 2) 事件 + 安全状态
   try {
-    const ev = await (await fetch(posUrl + '?t=' + Date.now(), { cache: 'no-store' })).json();
+    const raw2 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
+    const ev = raw2.content ? JSON.parse(atob(raw2.content.replace(/\n/g, ''))) : raw2;
     const list = (ev.events || []).slice().sort((a, b) => b.ts - a.ts);
     document.getElementById('evCount').textContent = list.length + ' 条';
     const box = document.getElementById('evList');
