@@ -1,1 +1,13 @@
-{"sos":false,"updated":0,"events":[]}
+{
+ "sos": true,
+ "updated": 1786574783,
+ "events": [
+  {
+   "ts": 1786574783,
+   "type": "SOS",
+   "lat": 39.792,
+   "lon": 116.391,
+   "src": "actions"
+  }
+ ]
+}
