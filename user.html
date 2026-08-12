@@ -74,7 +74,7 @@ a.link { color:var(--blue); font-size:12px; text-decoration:none; }
   <div class="auth-box">
     <div class="auth-logo">🛡️</div>
     <h2>亲情守护</h2>
-    <p class="auth-sub">家属端 · 查看位置与安全状态</p>
+    <p class="auth-sub">守护端 · 绑定设备后查看位置与安全状态</p>
 
     <div class="tabbar">
       <button class="tab active" id="tabLogin" onclick="switchTab('login')">登录</button>
@@ -88,12 +88,13 @@ a.link { color:var(--blue); font-size:12px; text-decoration:none; }
     </div>
 
     <div id="paneReg" style="display:none">
-      <input class="coord-input" id="rgName" placeholder="称呼（如：妈妈）" />
+      <input class="coord-input" id="rgName" placeholder="称呼（如：爸爸）" />
+      <input class="coord-input" id="rgDevId" placeholder="绑定设备ID（向管理员索取，如 DZWL54）" style="text-transform:uppercase" />
       <input class="coord-input" id="rgEmail" type="email" placeholder="电子邮箱（接收报警）" />
       <input class="coord-input" id="rgPass" type="password" placeholder="设置密码（≥6位）" />
       <input class="coord-input" id="rgPass2" type="password" placeholder="确认密码" />
       <button class="btn btn-primary" style="margin-top:14px" id="btnReg" onclick="doRegister()">注 册</button>
-      <div class="hint">注册后会收到一封验证邮件，点击邮件里的链接完成激活。激活后遇到危险时系统会自动发邮件通知你。</div>
+      <div class="hint">每个守护账号绑定一台设备，只能看该设备的位置与安全状态。注册后收到验证邮件，点链接激活；设备触发求救时会自动发邮件通知你。</div>
     </div>
 
     <div id="authMsg"></div>
@@ -107,6 +108,7 @@ a.link { color:var(--blue); font-size:12px; text-decoration:none; }
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:12px;color:var(--dim)" id="whoami"></span>
     <button onclick="doLogout()" style="background:var(--line);border:none;color:var(--dim);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer">退出</button>
+    <span style="font-size:12px;color:var(--dim)" id="devTag"></span>
   </div>
 </header>
 
@@ -155,6 +157,50 @@ const DATA_TOKEN = '' + 'github_pat_11AQWYJXY0G' + '5YzuL7VY6GB_Zo9SNYAV2PlMwUhq
 const SALT       = 'geofence-2026';       // 口令加盐, 与后端无关
 const POS_URL    = 'position.json';       // 设备位置 (由 Actions 每 2 分钟同步)
 const EV_URL     = 'events.json';         // 危险事件记录
+const DEV_ID     = 'GEOFENCE001';         // 默认设备(未绑定用户时的兜底); 看板实际按登录账号的 devId 读取
+
+// 反向地理编码: 填了高德 JS Key 用高德(精准), 留空自动用 OpenStreetMap Nominatim 兜底
+const AMAP_JS_KEY = '';   // ← 把你的高德 JS API Key 填到这里 (web 端 Key)
+
+let _amapReady = null;
+function loadAMap() {
+  if (_amapReady) return _amapReady;
+  if (!AMAP_JS_KEY) { _amapReady = Promise.resolve(false); return _amapReady; }
+  _amapReady = new Promise((res) => {
+    const s = document.createElement('script');
+    s.src = 'https://webapi.amap.com/maps?v=2.0&key=' + AMAP_JS_KEY;
+    s.onload = () => res(true); s.onerror = () => res(false);
+    document.head.appendChild(s);
+  });
+  return _amapReady;
+}
+
+const _geoCache = {};
+async function reverseGeo(lat, lon) {
+  const k = lat.toFixed(5) + ',' + lon.toFixed(5);
+  if (_geoCache[k] !== undefined) return _geoCache[k];
+  if (AMAP_JS_KEY) {
+    try {
+      await loadAMap();
+      const r = await new Promise((res) => AMap.plugin('AMap.Geocoder', () => {
+        new AMap.Geocoder().getAddress([lon, lat], (st, data) => res(st === 'complete' ? data.regeocode.formattedAddress : ''));
+      }));
+      if (r) { _geoCache[k] = r; return r; }
+    } catch (e) {}
+  }
+  try {
+    const u = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon + '&zoom=18&accept-language=zh-CN';
+    const d = await (await fetch(u, { headers: { 'Accept': 'application/json' } })).json();
+    const r = (d.display_name || '').split(',').slice(0, 3).join(' ');
+    if (r) { _geoCache[k] = r; return r; }
+  } catch (e) {}
+  const fallback = lat.toFixed(6) + ', ' + lon.toFixed(6);
+  _geoCache[k] = fallback; return fallback;
+}
+
+async function geoFill(lat, lon) {
+  try { return await reverseGeo(lat, lon); } catch (e) { return lat.toFixed(6) + ', ' + lon.toFixed(6); }
+}
 const SITE_BASE  = location.origin + location.pathname.replace(/[^/]*$/, '');
 
 const GH = { Authorization: 'Bearer ' + DATA_TOKEN, Accept: 'application/vnd.github+json' };
@@ -217,10 +263,12 @@ function switchTab(t) {
 async function doRegister() {
   const name = document.getElementById('rgName').value.trim();
   const email = document.getElementById('rgEmail').value.trim().toLowerCase();
+  const devId = document.getElementById('rgDevId').value.trim().toUpperCase();
   const p1 = document.getElementById('rgPass').value;
   const p2 = document.getElementById('rgPass2').value;
   if (!name) return msg('请填写称呼', 'err');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return msg('邮箱格式不正确', 'err');
+  if (!/^[A-Z0-9]{4,16}$/.test(devId)) return msg('设备ID格式不对（4-16 位字母数字，如 DZWL54）', 'err');
   if (p1.length < 6) return msg('密码至少 6 位', 'err');
   if (p1 !== p2) return msg('两次输入的密码不一致', 'err');
 
@@ -232,7 +280,7 @@ async function doRegister() {
     const old = await ghGet('users/pending/' + uid + '.json');
     const code = randHex(16);
     const rec = {
-      uid: uid, email: email, name: name,
+      uid: uid, email: email, name: name, devId: devId,
       pwd: await sha256hex(email + ':' + p1 + ':' + SALT),
       code: code,
       verifyUrl: SITE_BASE + 'user.html?verify=' + uid + '&c=' + code,
@@ -298,7 +346,9 @@ function enterDashboard() {
   const u = JSON.parse(localStorage.getItem('gf_user') || 'null');
   if (!u) return;
   document.getElementById('authOverlay').classList.add('hide');
-  document.getElementById('whoami').textContent = u.name || u.email;
+  window.__gfUser = u;
+  document.getElementById('whoami').textContent = (u.name || u.email);
+  if (u.devId) document.getElementById('devTag').textContent = '设备 ' + u.devId;
   initMap();
   refresh();
   setInterval(refresh, 10000);
@@ -364,7 +414,9 @@ function fmtTime(ts) {
 async function refresh() {
   // 1) 位置
   try {
-    const pos = (await (await fetch(POS_URL + '?t=' + Date.now(), { cache: 'no-store' })).json()).position || {};
+    const DID = (window.__gfUser && window.__gfUser.devId) || DEV_ID;
+  const posUrl = 'devices/' + DID + '/state.json';
+  const pos = (await (await fetch(posUrl + '?t=' + Date.now(), { cache: 'no-store' })).json()).position || {};
     const age = pos.ts ? (Date.now() / 1000 - pos.ts) : 1e9;
     const online = age < 600;
     document.getElementById('statusDot').className = online ? 'online' : 'offline';
@@ -381,7 +433,7 @@ async function refresh() {
 
   // 2) 事件 + 安全状态
   try {
-    const ev = await (await fetch(EV_URL + '?t=' + Date.now(), { cache: 'no-store' })).json();
+    const ev = await (await fetch(posUrl + '?t=' + Date.now(), { cache: 'no-store' })).json();
     const list = (ev.events || []).slice().sort((a, b) => b.ts - a.ts);
     document.getElementById('evCount').textContent = list.length + ' 条';
     const box = document.getElementById('evList');
@@ -420,7 +472,7 @@ function tokenReady() { return DATA_TOKEN.indexOf('PASTE_TOKEN') < 0 && DATA_TOK
   if (!tokenReady()) {
     document.getElementById('btnLogin').disabled = true;
     document.getElementById('btnReg').disabled = true;
-    msg('⚠️ 家属系统尚未完成配置（缺少访问凭证），请联系管理员在 user.html 里填入 DATA_TOKEN。', 'err');
+    msg('⚠️ 守护系统尚未完成配置（缺少访问凭证），请联系管理员在 user.html 里填入 DATA_TOKEN。', 'err');
     return;
   }
   const verified = await tryVerify();

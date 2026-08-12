@@ -17,6 +17,7 @@ jobs:
       lat: ${{ steps.pull.outputs.lat }}
       lon: ${{ steps.pull.outputs.lon }}
       ts:  ${{ steps.pull.outputs.ts }}
+      devid: ${{ steps.pull.outputs.devid }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +25,7 @@ jobs:
         id: pull
         env:
           BEMFA_UID: ${{ secrets.BEMFA_UID }}
+          DEVID: ${{ secrets.BEMFA_TOPIC }}
           TOPIC: ${{ secrets.BEMFA_TOPIC }}
         run: |
           python3 - <<'EOF'
@@ -31,6 +33,8 @@ jobs:
 
           UID = os.environ.get('BEMFA_UID', '')
           TOPIC = os.environ.get('BEMFA_TOPIC', 'geofence001')
+          DEVID = os.environ.get('DEVID', TOPIC).strip().upper() or 'GEOFENCE001'
+          os.makedirs('devices/' + DEVID, exist_ok=True)
           out = {"position": {"lat": 0, "lon": 0, "sats": 0, "inFence": False, "dist": 0, "ts": 0, "sos": False}}
 
           def pull_with_wait(total_s):
@@ -108,7 +112,7 @@ jobs:
 
           ev['events'] = evs[-100:]
           ev['updated'] = now
-          with open('events.json', 'w', encoding='utf-8') as f:
+          with open('devices/%s/state.json' % DEVID, 'w', encoding='utf-8') as f:
               json.dump(ev, f, ensure_ascii=False)
 
           # ---------- 3) 保底: 抓不到新坐标时保留上次的 position.json ----------
@@ -123,7 +127,7 @@ jobs:
               except Exception as e:
                   print("KEEP failed:", e)
 
-          with open('position.json', 'w', encoding='utf-8') as f:
+          with open('devices/%s/state.json' % DEVID, 'w', encoding='utf-8') as f:
               json.dump(out, f, ensure_ascii=False)
 
           # ---------- 4) 输出给下一个 job ----------
@@ -132,13 +136,14 @@ jobs:
               f.write("lat=%.6f\n" % sos_lat)
               f.write("lon=%.6f\n" % sos_lon)
               f.write("ts=%d\n" % now)
+          f.write("devid=%s\n" % DEVID)
           EOF
 
       - name: Commit and push
         run: |
           git config user.name "geofence-bot"
           git config user.email "geofence-bot@users.noreply.github.com"
-          git add position.json events.json
+          git add devices/
           git diff --cached --quiet && echo "no change" || {
             git commit -m "sync position $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             git pull --rebase --autostash || true
@@ -159,5 +164,5 @@ jobs:
             -H "Authorization: Bearer $DATA_PAT" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/alllljj/geofence-data/dispatches \
-            -d '{"event_type":"sos-alert","client_payload":{"lat":${{ needs.sync.outputs.lat }},"lon":${{ needs.sync.outputs.lon }},"ts":${{ needs.sync.outputs.ts }}}}'
+            -d '{"event_type":"sos-alert","client_payload":{"lat":${{ needs.sync.outputs.lat }},"lon":${{ needs.sync.outputs.lon }},"ts":${{ needs.sync.outputs.ts }},"devId":"${{ needs.sync.outputs.devid }}"}}'
           echo "dispatched"
