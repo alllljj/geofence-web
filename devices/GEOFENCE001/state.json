@@ -5,9 +5,9 @@
   "sats": 15,
   "inFence": false,
   "dist": 253.8,
-  "ts": 1786596961,
+  "ts": 1786597103,
   "sos": false,
-  "_hb": 1786596961
+  "_hb": 1786597103
  },
  "events": [
   {
@@ -40,6 +40,6 @@
    "devId": "GEOFENCE001"
   }
  ],
- "updated": 1786596961,
+ "updated": 1786597103,
  "sos": true
 }
