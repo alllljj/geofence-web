@@ -89,7 +89,7 @@ a.link { color:var(--blue); font-size:12px; text-decoration:none; }
 
     <div id="paneReg" style="display:none">
       <input class="coord-input" id="rgName" placeholder="称呼（如：爸爸）" />
-      <input class="coord-input" id="rgDevId" placeholder="绑定设备ID（向管理员索取，如 DZWL54）" style="text-transform:uppercase" />
+      <input class="coord-input" id="rgDevId" placeholder="绑定设备ID（默认 GEOFENCE001，如有多台设备可改）" style="text-transform:uppercase" />
       <input class="coord-input" id="rgEmail" type="email" placeholder="电子邮箱（接收报警）" />
       <input class="coord-input" id="rgPass" type="password" placeholder="设置密码（≥6位）" />
       <input class="coord-input" id="rgPass2" type="password" placeholder="确认密码" />
@@ -263,7 +263,8 @@ function switchTab(t) {
 async function doRegister() {
   const name = document.getElementById('rgName').value.trim();
   const email = document.getElementById('rgEmail').value.trim().toLowerCase();
-  const devId = document.getElementById('rgDevId').value.trim().toUpperCase();
+  let devId = document.getElementById('rgDevId').value.trim().toUpperCase();
+  if (!devId) devId = 'GEOFENCE001';   // 默认绑定设备
   const p1 = document.getElementById('rgPass').value;
   const p2 = document.getElementById('rgPass2').value;
   if (!name) return msg('请填写称呼', 'err');
@@ -421,14 +422,19 @@ async function refresh() {
   const pos = (posDoc && posDoc.position) || {};
     const age = pos.ts ? (Date.now() / 1000 - pos.ts) : 1e9;
     const online = age < 600;
+    const hasFix = !!(pos.lat && pos.lon);
     document.getElementById('statusDot').className = online ? 'online' : 'offline';
-    document.getElementById('devOnline').textContent = online ? '在线' : (pos.ts ? '离线 (' + Math.round(age / 60) + ' 分钟前)' : '无数据');
+    document.getElementById('devOnline').textContent = online
+      ? (hasFix ? '在线' : '在线（GPS 无定位信号）')
+      : (pos.ts ? '离线 (' + Math.round(age / 60) + ' 分钟前)' : '无数据');
     if (pos.lat && pos.lon) {
       document.getElementById('posInfo').textContent = pos.lat.toFixed(6) + ', ' + pos.lon.toFixed(6);
       if (!devMarker) {
         devMarker = L.circleMarker([pos.lat, pos.lon], { radius: 9, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: .9, weight: 3 }).addTo(map);
         map.setView([pos.lat, pos.lon], 17);
       } else devMarker.setLatLng([pos.lat, pos.lon]);
+    } else if (online) {
+      document.getElementById('posInfo').textContent = '设备在线，但 GPS 尚未定位（可能在室内或无卫星信号）';
     }
     if (pos.ts) document.getElementById('lastUpdate').textContent = fmtTime(pos.ts);
   } catch (e) {}
