@@ -281,10 +281,11 @@ function refreshCam() {
   .then(function(r) { return r.json(); })
   .then(function(files) {
     if (!files || !files.length) throw new Error('no files');
-    // 找最大序号
+    // 找最大序号 (按数字比较, 不是字符串: img001045 < img100020)
+    function seqOf(n) { return parseInt(n.replace('img', '').replace('.jpg', ''), 10) || 0; }
     var best = files[0];
     for (var i = 1; i < files.length; i++) {
-      if (files[i].name > best.name) best = files[i];
+      if (seqOf(files[i].name) > seqOf(best.name)) best = files[i];
     }
     // 2) 读该文件 base64 内容
     return fetch(best.url, { headers: h }).then(function(r) { return r.json(); })
