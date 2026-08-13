@@ -1,11 +1,11 @@
 {
  "position": {
-  "lat": 39.797471,
-  "lon": 116.400368,
-  "sats": 20,
+  "lat": 39.797577,
+  "lon": 116.400372,
+  "sats": 21,
   "inFence": false,
-  "dist": 16.2,
-  "ts": 1786602071,
+  "dist": 23.7,
+  "ts": 1786602143,
   "sos": false,
   "_hb": 1786597240
  },
@@ -40,6 +40,6 @@
    "devId": "GEOFENCE001"
   }
  ],
- "updated": 1786602071,
+ "updated": 1786602143,
  "sos": false
 }
