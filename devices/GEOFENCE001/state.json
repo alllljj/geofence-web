@@ -5,7 +5,7 @@
   "sats": 14,
   "inFence": false,
   "dist": 253.8,
-  "ts": 1786600425,
+  "ts": 1786600432,
   "sos": false,
   "_hb": 1786597240
  },
@@ -40,6 +40,6 @@
    "devId": "GEOFENCE001"
   }
  ],
- "updated": 1786600425,
+ "updated": 1786600432,
  "sos": true
 }
