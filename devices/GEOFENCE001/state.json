@@ -1,6 +1,6 @@
 {
  "sos": true,
- "updated": 1786670614,
+ "updated": 1786670632,
  "events": [
   {
    "ts": 1786553864,
@@ -38,7 +38,7 @@
   "sats": 4,
   "inFence": false,
   "dist": 30.5,
-  "ts": 1786670614,
+  "ts": 1786670632,
   "sos": false
  }
 }
