@@ -1,6 +1,6 @@
 {
- "sos": false,
- "updated": 1786728094,
+ "sos": true,
+ "updated": 1786728108,
  "events": [
   {
    "ts": 1786553864,
@@ -126,16 +126,24 @@
    "lon": 0,
    "src": "pc",
    "devId": "GEOFENCE001"
+  },
+  {
+   "ts": 1786728108,
+   "type": "SOS",
+   "lat": 39.797441,
+   "lon": 116.400233,
+   "src": "pc",
+   "devId": "GEOFENCE001"
   }
  ],
  "position": {
-  "lat": 39.797439,
-  "lon": 116.400242,
+  "lat": 39.797441,
+  "lon": 116.400233,
   "sats": 14,
   "inFence": false,
   "dist": 0.0,
-  "ts": 1786728094,
-  "sos": false
+  "ts": 1786728108,
+  "sos": true
  },
  "fenceAck": {
   "ts": 1786728091,
