@@ -362,9 +362,11 @@ function sendFenceWithAck(body, attempt) {
       if (j.code !== 0) throw new Error(j.message || '巴法云返回异常');
     });
   };
+  // Worker 优先, 失败自动回退直连巴法云 (网页里的 BEMFA_UID 是可靠值)
   const doSend = WORKER_URL
     ? fetch(WORKER_URL + '/fence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd }) })
         .then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.err || 'unknown'); })
+        .catch(e => { console.warn('Worker /fence 失败, 回退直连巴法云:', e.message); return doHttp(); })
     : doHttp();
 
   doSend
@@ -412,9 +414,11 @@ function clearFenceWithAck(attempt) {
       if (j.code !== 0) throw new Error(j.message || '巴法云返回异常');
     });
   };
+  // Worker 优先, 失败自动回退直连巴法云
   const doSend = WORKER_URL
     ? fetch(WORKER_URL + '/fence', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: 'CLEAR' }) })
         .then(r => r.json()).then(j => { if (!j.ok) throw new Error(j.err || 'unknown'); })
+        .catch(e => { console.warn('Worker /fence CLEAR 失败, 回退直连巴法云:', e.message); return doHttp(); })
     : doHttp();
 
   doSend
