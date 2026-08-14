@@ -485,22 +485,32 @@ function loadSos() {
 
 // ================= 位置轮询 =================
 function loadPosition() {
-  // Worker 优先, 但加 3 秒超时控制 (workers.dev 不稳定时快速回退)
-  const fetchTimeout = (url, ms) => {
+  // 超时控制 (网络不稳时快速回退)
+  const fetchTimeout = (url, ms, opt) => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), ms);
-    return fetch(url, { signal: ctrl.signal, cache: 'no-store' }).finally(() => clearTimeout(t));
+    return fetch(url, Object.assign({ signal: ctrl.signal, cache: 'no-store' }, opt || {})).finally(() => clearTimeout(t));
   };
+  // 数据源优先级: Worker(实时) → GitHub API state.json(实时,无CDN缓存) → position.json(Pages静态,可能滞后)
+  const ghPos = () => fetchTimeout('https://api.github.com/repos/alllljj/geofence-web/contents/devices/GEOFENCE001/state.json?t=' + Date.now(), 5000,
+    { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN, 'Accept': 'application/vnd.github+json' } })
+    .then(r => { if (!r.ok) throw new Error('gh ' + r.status); return r.json(); })
+    .then(j => { const d = JSON.parse(atob(j.content.replace(/\n/g, ''))); return d.position || null; })
+    .catch(() => null);
   const tryWorker = WORKER_URL ? fetchTimeout(WORKER_URL + '/position?t=' + Date.now(), 3000)
     .then(r => r.json()).then(d => d.position || null).catch(() => null) : Promise.resolve(null);
   tryWorker.then(pos => {
     if (pos && (pos.lat !== 0 || pos.lon !== 0)) { applyPosition(pos); return; }
-    // 回退: position.json (本地中转写入)
-    fetchTimeout(POS_URL + '?t=' + Date.now(), 5000).then(r => r.json()).then(d => {
-      const p = d.position || d;
-      if (p.lat !== 0 || p.lon !== 0) applyPosition(p);
-      else markOffline();
-    }).catch(() => markOffline());
+    // 回退2: GitHub API 直读 state.json (实时)
+    ghPos().then(p2 => {
+      if (p2 && (p2.lat !== 0 || p2.lon !== 0)) { applyPosition(p2); return; }
+      // 回退3: position.json (Pages 静态, 可能被 CDN 缓存滞后)
+      fetchTimeout(POS_URL + '?t=' + Date.now(), 5000).then(r => r.json()).then(d => {
+        const p = d.position || d;
+        if (p.lat !== 0 || p.lon !== 0) applyPosition(p);
+        else markOffline();
+      }).catch(() => markOffline());
+    });
   });
 }
 function applyPosition(p) {
