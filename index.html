@@ -370,7 +370,7 @@ function sendFenceWithAck(body, attempt) {
   doSend
     .then(() => waitFenceAck(sendStart))
     .then(ack => {
-      toast('? 围栏已下发，设备已确认 (FENCE_OK)' + (ack && ack.verts ? '，' + ack.verts + ' 顶点' : ''));
+      toast('围栏已下发，设备已确认 (FENCE_OK)' + (ack && ack.verts ? '，' + ack.verts + ' 顶点' : ''));
       onFenceSent(body);
     })
     .catch(err => {
@@ -378,7 +378,7 @@ function sendFenceWithAck(body, attempt) {
         toast('设备未确认，2 秒后重试… (' + err.message + ')');
         setTimeout(() => sendFenceWithAck(body, attempt + 1), 2000);
       } else {
-        toast('? 围栏下发失败：设备未确认，请检查设备网络后重试');
+        toast('围栏下发失败：设备未确认，请检查设备网络后重试');
       }
     });
 }
@@ -419,13 +419,13 @@ function clearFenceWithAck(attempt) {
 
   doSend
     .then(() => waitClearAck(sendStart))
-    .then(() => { toast('? 围栏已清除，设备已确认 (CLEAR_OK)'); onFenceCleared(); })
+    .then(() => { toast('围栏已清除，设备已确认 (CLEAR_OK)'); onFenceCleared(); })
     .catch(err => {
       if (attempt < 3) {
         toast('设备未确认，2 秒后重试… (' + err.message + ')');
         setTimeout(() => clearFenceWithAck(attempt + 1), 2000);
       } else {
-        toast('? 清除失败：设备未确认，请检查设备网络后重试');
+        toast('清除失败：设备未确认，请检查设备网络后重试');
       }
     });
 }
@@ -445,12 +445,12 @@ function waitClearAck(sendStart, elapse) {
 }
 
 function onFenceSent(body) {
-  toast('? 围栏已下发');
+  toast('围栏已下发');
   const verts = body.split(';').map(p => { const c = p.split(','); return [parseFloat(c[0]), parseFloat(c[1])]; });
   saveFence(verts);
   drawing = []; renderTemp(); setMode('view');
 }
-function onFenceCleared() { toast('? 围栏已清除'); saveFence([]); }
+function onFenceCleared() { toast('围栏已清除'); saveFence([]); }
 
 // ================= SOS 求救信号 =================
 function sosFmtTime(ts) {
