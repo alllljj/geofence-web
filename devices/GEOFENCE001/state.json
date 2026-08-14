@@ -1,1 +1,66 @@
-{"sos":true,"updated":1786718519,"events":[{"ts":1786553864,"type":"SOS","lat":0,"lon":0,"src":"actions"},{"ts":1786554581,"type":"SOS","lat":39.823456,"lon":116.423456,"src":"pc","devId":"GEOFENCE001"},{"ts":1786574783,"type":"SOS","lat":39.792,"lon":116.391,"src":"actions"},{"ts":1786575291,"type":"SOS","lat":39.908,"lon":116.397,"src":"actions"},{"ts":1786707489,"type":"SOS","lat":39.797466,"lon":116.400303,"src":"pc","devId":"GEOFENCE001"},{"ts":1786716161,"type":"SOS","lat":39.7975,"lon":116.40035,"src":"pc","devId":"GEOFENCE001"}],"position":{"lat":39.797654,"lon":116.400333,"sats":18,"inFence":true,"dist":-124.2,"ts":1786718492,"sos":true},"fenceAck":{"ts":1786707448,"ok":true,"kind":"FENCE_OK","verts":4}}
+{
+ "sos": true,
+ "updated": 1786718522,
+ "events": [
+  {
+   "ts": 1786553864,
+   "type": "SOS",
+   "lat": 0,
+   "lon": 0,
+   "src": "actions"
+  },
+  {
+   "ts": 1786554581,
+   "type": "SOS",
+   "lat": 39.823456,
+   "lon": 116.423456,
+   "src": "pc",
+   "devId": "GEOFENCE001"
+  },
+  {
+   "ts": 1786574783,
+   "type": "SOS",
+   "lat": 39.792,
+   "lon": 116.391,
+   "src": "actions"
+  },
+  {
+   "ts": 1786575291,
+   "type": "SOS",
+   "lat": 39.908,
+   "lon": 116.397,
+   "src": "actions"
+  },
+  {
+   "ts": 1786707489,
+   "type": "SOS",
+   "lat": 39.797466,
+   "lon": 116.400303,
+   "src": "pc",
+   "devId": "GEOFENCE001"
+  },
+  {
+   "ts": 1786716161,
+   "type": "SOS",
+   "lat": 39.7975,
+   "lon": 116.40035,
+   "src": "pc",
+   "devId": "GEOFENCE001"
+  }
+ ],
+ "position": {
+  "lat": 39.797654,
+  "lon": 116.400335,
+  "sats": 21,
+  "inFence": true,
+  "dist": -124.4,
+  "ts": 1786718522,
+  "sos": true
+ },
+ "fenceAck": {
+  "ts": 1786707448,
+  "ok": true,
+  "kind": "FENCE_OK",
+  "verts": 4
+ }
+}
