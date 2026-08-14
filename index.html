@@ -485,11 +485,18 @@ function loadSos() {
 
 // ================= 位置轮询 =================
 function loadPosition() {
-  const tryWorker = WORKER_URL ? fetch(WORKER_URL + '/position?t=' + Date.now()).then(r => r.json()).then(d => d.position || null).catch(() => null) : Promise.resolve(null);
+  // Worker 优先, 但加 3 秒超时控制 (workers.dev 不稳定时快速回退)
+  const fetchTimeout = (url, ms) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    return fetch(url, { signal: ctrl.signal, cache: 'no-store' }).finally(() => clearTimeout(t));
+  };
+  const tryWorker = WORKER_URL ? fetchTimeout(WORKER_URL + '/position?t=' + Date.now(), 3000)
+    .then(r => r.json()).then(d => d.position || null).catch(() => null) : Promise.resolve(null);
   tryWorker.then(pos => {
     if (pos && (pos.lat !== 0 || pos.lon !== 0)) { applyPosition(pos); return; }
     // 回退: position.json (本地中转写入)
-    fetch(POS_URL + '?t=' + Date.now()).then(r => r.json()).then(d => {
+    fetchTimeout(POS_URL + '?t=' + Date.now(), 5000).then(r => r.json()).then(d => {
       const p = d.position || d;
       if (p.lat !== 0 || p.lon !== 0) applyPosition(p);
       else markOffline();
