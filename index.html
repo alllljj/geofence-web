@@ -211,7 +211,7 @@ const API = 'https://apis.bemfa.com/va';
 // 位置数据源:
 //   优先级1: Cloudflare Worker (需自行部署 worker.js, 把这里改成你的 Worker 地址)
 //   优先级2: 本地中转脚本写入的 position.json (GitHub Pages 同目录)
-const WORKER_URL = '';   // ⚠️ 填入你的 Cloudflare Worker 地址 (如 https://geofence-relay.xxx.workers.dev), 留空则用 position.json
+const WORKER_URL = 'https://geofence-sync.geofence-relay.workers.dev';   // ⚠️ 填入你的 Cloudflare Worker 地址 (如 https://geofence-relay.xxx.workers.dev), 留空则用 position.json
 const POS_URL = 'position.json';
 
 // 家属账号库访问 (geofence-data 私有仓库): 用于报警记录显示该设备的守护联系邮箱
