@@ -232,9 +232,9 @@ async function guardianMails(devId) {
       if (!it.name.endsWith('.json')) continue;
       const rr = await fetch(it.url, { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } });
       if (!rr.ok) continue;
-      const rec = JSON.parse(atob((await rr.json()).content.replace(/\n/g, '')));
+      const rec = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob((await rr.json()).content.replace(/\n/g, '')), c => c.charCodeAt(0))));
       if (rec.devId && rec.devId.toUpperCase() === String(devId).toUpperCase() && rec.email)
-        emails.push(rec.email + (rec.name ? '（' + rec.name + '）' : ''));
+        emails.push(rec.email);  // 只显示邮箱，避免名字编码问题
     }
     _mailCache[devId] = { t: Date.now(), emails: emails };
     return emails;
