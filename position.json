@@ -4,8 +4,8 @@
   "lon": 116.40032,
   "sats": 9,
   "inFence": false,
-  "dist": 0,
-  "ts": 1786772660,
+  "dist": 0.0,
+  "ts": 1786772672,
   "sos": false
  }
 }
