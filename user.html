@@ -468,7 +468,8 @@ async function refresh() {
       const items = list.slice(0, 20).map(e => {
         const addr0 = e.addr || (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '危险求救信号');
         return '<div class="ev" data-k="' + (e.lat ? e.lat.toFixed(5) + ',' + e.lon.toFixed(5) : '') + '">' +
-          '<div class="t">' + (e.type === 'SAFE' ? '' : '⚠ ') + fmtTime(e.ts) + (e.type === 'SAFE' ? '（已解除）' : '') + '</div>' +
+          '<div class="t" style="' + (e.type === 'SAFE' ? 'color:#22c55e' : 'color:#ef4444') + '">' +
+            (e.type === 'SAFE' ? '✅ 解除 ' : '⚠ 求救 ') + fmtTime(e.ts) + '</div>' +
           '<div class="a">' + addr0 + '</div>' +
           '<div class="c">' + (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '无定位数据') +
           (e.lat ? ' · <a class="link" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图查看</a>' : '') +
