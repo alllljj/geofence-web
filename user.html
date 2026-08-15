@@ -413,10 +413,11 @@ function fmtTime(ts) {
 }
 
 async function refresh() {
+  // 共享: state.json 地址 (位置段 + 事件段都用)
+  const DID = (window.__gfUser && window.__gfUser.devId) || DEV_ID;
+  const posUrl = 'https://api.github.com/repos/alllljj/geofence-web/contents/devices/' + DID + '/state.json';
   // 1) 位置
   try {
-    const DID = (window.__gfUser && window.__gfUser.devId) || DEV_ID;
-  const posUrl = 'https://api.github.com/repos/alllljj/geofence-web/contents/devices/' + DID + '/state.json';
   const raw1 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
   const posDoc = raw1.content ? JSON.parse(b64dec(raw1.content)) : raw1;
   const pos = (posDoc && posDoc.position) || {};
