@@ -1,6 +1,6 @@
 {
- "sos": false,
- "updated": 1786728311,
+ "sos": true,
+ "updated": 1786782747,
  "events": [
   {
    "ts": 1786574783,
@@ -156,6 +156,14 @@
    "type": "SAFE",
    "lat": 0,
    "lon": 0,
+   "src": "pc",
+   "devId": "GEOFENCE001"
+  },
+  {
+   "ts": 1786782747,
+   "type": "SOS",
+   "lat": 39.797751,
+   "lon": 116.400357,
    "src": "pc",
    "devId": "GEOFENCE001"
   }
