@@ -444,7 +444,11 @@ async function refresh() {
   try {
     const raw2 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
     const ev = raw2.content ? JSON.parse(b64dec(raw2.content)) : raw2;
-    const list = (ev.events || []).slice().sort((a, b) => b.ts - a.ts);
+    // 按登录用户过滤: 事件带 mailedTo(发给谁的邮件) 则只显示包含当前登录邮箱的;
+    // 无 mailedTo(旧数据/未发邮件) 则显示 (兼容历史)
+    const myEmail = (window.__gfUser && window.__gfUser.email || '').toLowerCase();
+    const allEvs = (ev.events || []);
+    const list = allEvs.filter(e => !e.mailedTo || !e.mailedTo.length || e.mailedTo.some(m => String(m).toLowerCase() === myEmail)).slice().sort((a, b) => b.ts - a.ts);
     document.getElementById('evCount').textContent = list.length + ' 条';
     document.getElementById('evList').style.color = '';
     const box = document.getElementById('evList');
