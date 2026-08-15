@@ -3,9 +3,9 @@
   "lat": 39.797551,
   "lon": 116.400355,
   "sats": 8,
-  "inFence": false,
-  "dist": 0.0,
-  "ts": 1786773882,
+  "inFence": true,
+  "dist": -42.5,
+  "ts": 1786773901,
   "sos": false
  }
 }
