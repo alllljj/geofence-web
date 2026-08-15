@@ -385,21 +385,30 @@ function sendFenceWithAck(body, attempt) {
     });
 }
 
-// 轮询 state.json.fenceAck, 等待设备确认 (最多 20 秒)
+// 轮询设备确认 fenceAck, 等待 FENCE_OK/CLEAR_OK (最多 20 秒)
+// 优先走 Worker /ack: 每次轮询主动触发 sync 拉巴法云队列, 设备回执进队列后 <=2 秒即可确认 (不等 cron)
+// Worker 不可用(被墙/超时)时回退 GitHub API 直读 state.json (依赖 cron 或本机 sos_watch 写入)
 function waitFenceAck(sendStart, elapse) {
   elapse = elapse || 0;
-  const url = 'https://api.github.com/repos/alllljj/geofence-web/contents/devices/GEOFENCE001/state.json?t=' + Date.now();
-  return fetch(url, { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' })
-    .then(r => { if (!r.ok) throw new Error('无法读取设备状态'); return r.json(); })
-    .then(j => {
-      const doc = JSON.parse(atob(j.content.replace(/\n/g, '')));
-      const ack = doc.fenceAck;
+  const readAck = (WORKER_URL
+    ? fetch(WORKER_URL + '/ack?t=' + Date.now(), { signal: AbortSignal.timeout(6000) })
+        .then(r => r.json()).then(j => (j && j.fenceAck) || null)
+        .catch(e => { console.warn('/ack 失败, 回退 GitHub API:', e.message); return null; })
+        .then(ack => ack ? ack : fetch('https://api.github.com/repos/alllljj/geofence-web/contents/devices/GEOFENCE001/state.json?t=' + Date.now(),
+            { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' })
+            .then(r => { if (!r.ok) throw new Error('无法读取设备状态'); return r.json(); })
+            .then(j => JSON.parse(atob(j.content.replace(/\n/g, ''))).fenceAck || null))
+    : fetch('https://api.github.com/repos/alllljj/geofence-web/contents/devices/GEOFENCE001/state.json?t=' + Date.now(),
+        { headers: { 'Authorization': 'Bearer ' + DATA_TOKEN, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' })
+        .then(r => { if (!r.ok) throw new Error('无法读取设备状态'); return r.json(); })
+        .then(j => JSON.parse(atob(j.content.replace(/\n/g, ''))).fenceAck || null));
+  return readAck
+    .then(ack => {
       if (ack && ack.ts >= sendStart) return ack;   // 确认时间在下发之后
       if (elapse >= 20000) throw new Error('等待确认超时');
       return new Promise(res => setTimeout(() => res(waitFenceAck(sendStart, elapse + 2000)), 2000));
     });
 }
-
 function clearFence() {
   if (!confirm('确认清除围栏？')) return;
   clearFenceWithAck(1);
