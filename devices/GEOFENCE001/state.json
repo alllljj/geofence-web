@@ -1,6 +1,6 @@
 {
- "sos": true,
- "updated": 1786783794,
+ "sos": false,
+ "updated": 1786783825,
  "events": [
   {
    "ts": 1786553864,
@@ -222,16 +222,24 @@
     "18954754598@163.com",
     "1328291045@qq.com"
    ]
+  },
+  {
+   "ts": 1786783825,
+   "type": "SAFE",
+   "lat": 0,
+   "lon": 0,
+   "src": "pc",
+   "devId": "GEOFENCE001"
   }
  ],
  "position": {
-  "lat": 39.798206,
-  "lon": 116.400283,
+  "lat": 0,
+  "lon": 0,
   "sats": 13,
   "inFence": false,
   "dist": 0.0,
-  "ts": 1786783794,
-  "sos": true
+  "ts": 1786783825,
+  "sos": false
  },
  "fenceAck": {
   "ts": 1786783611,
