@@ -418,7 +418,7 @@ async function refresh() {
     const DID = (window.__gfUser && window.__gfUser.devId) || DEV_ID;
   const posUrl = 'https://api.github.com/repos/alllljj/geofence-web/contents/devices/' + DID + '/state.json';
   const raw1 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
-  const posDoc = raw1.content ? JSON.parse(atob(raw1.content.replace(/\n/g, ''))) : raw1;
+  const posDoc = raw1.content ? JSON.parse(b64dec(raw1.content)) : raw1;
   const pos = (posDoc && posDoc.position) || {};
     const age = pos.ts ? (Date.now() / 1000 - pos.ts) : 1e9;
     const online = age < 600;
@@ -442,9 +442,10 @@ async function refresh() {
   // 2) 事件 + 安全状态
   try {
     const raw2 = (await (await fetch(posUrl, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + DATA_TOKEN } })).json());
-    const ev = raw2.content ? JSON.parse(atob(raw2.content.replace(/\n/g, ''))) : raw2;
+    const ev = raw2.content ? JSON.parse(b64dec(raw2.content)) : raw2;
     const list = (ev.events || []).slice().sort((a, b) => b.ts - a.ts);
     document.getElementById('evCount').textContent = list.length + ' 条';
+    document.getElementById('evList').style.color = '';
     const box = document.getElementById('evList');
     if (!list.length) box.textContent = '暂无报警记录';
     else box.innerHTML = await Promise.all(list.slice(0, 20).map(async e => {
