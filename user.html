@@ -471,7 +471,12 @@ async function refresh() {
     setStatus(danger, danger
       ? (latest ? '求救信号于 ' + fmtTime(latest.ts) + ' 触发，请立即联系！' : '设备发出求救信号！')
       : (latest ? '上次报警：' + fmtTime(latest.ts) : '一切正常，未收到求救信号'));
-  } catch (e) {}
+  } catch (e) {
+    document.getElementById('evCount').textContent = '读取失败';
+    const bx = document.getElementById('evList');
+    bx.textContent = '⚠ 事件加载失败: ' + (e && e.message ? e.message : e);
+    bx.style.color = '#f59e0b';
+  }
 }
 
 // ---------- 启动 ----------
