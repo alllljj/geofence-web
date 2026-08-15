@@ -144,7 +144,7 @@ a.link { color:var(--blue); font-size:12px; text-decoration:none; }
     <img id="camImg" alt="现场画面" style="width:100%;max-height:200px;border-radius:10px;background:#000;display:block;min-height:90px;object-fit:contain" />
     <div id="camLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px">画面加载中…</div>
   </div>
-  <div class="hint" style="text-align:center">设备定时抓拍上传（约 10 秒刷新）</div>
+  <div class="hint" style="text-align:center">设备定时抓拍上传</div>
 </div>
 
 <div class="card">
@@ -400,8 +400,9 @@ function refreshCam() {
     for (var i = 1; i < files.length; i++) {
       if (seqOf(files[i].name) > seqOf(best.name)) best = files[i];
     }
-    // 2) 读该文件 base64 内容
-    return fetch(best.url + '?t=' + Date.now(), { headers: h }).then(function(r) { return r.json(); })
+    // 2) 读该文件 base64 内容 (best.url 已带 ?ref=main, 需去掉再拼时间戳防缓存)
+    var fu = best.url.split('?')[0] + '?t=' + Date.now();
+    return fetch(fu, { headers: h }).then(function(r) { return r.json(); })
       .then(function(d) {
         if (d && d.content) {
           img.src = 'data:image/jpeg;base64,' + d.content;
