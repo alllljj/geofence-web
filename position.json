@@ -1,11 +1,1 @@
-{
- "position": {
-  "lat": 39.797549,
-  "lon": 116.400423,
-  "sats": 13,
-  "inFence": false,
-  "dist": 0.0,
-  "ts": 1786776942,
-  "sos": false
- }
-}
+{"position":{"lat":39.797549,"lon":116.400423,"sats":13,"inFence":false,"dist":0,"ts":1786776948,"sos":false}}
