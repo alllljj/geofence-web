@@ -182,20 +182,30 @@ async function reverseGeo(lat, lon) {
   if (AMAP_JS_KEY) {
     try {
       await loadAMap();
-      const r = await new Promise((res) => AMap.plugin('AMap.Geocoder', () => {
-        new AMap.Geocoder().getAddress([lon, lat], (st, data) => res(st === 'complete' ? data.regeocode.formattedAddress : ''));
-      }));
+      const r = await new Promise((res) => {
+        const to = setTimeout(() => res(''), 2500);
+        AMap.plugin('AMap.Geocoder', () => {
+          new AMap.Geocoder().getAddress([lon, lat], (st, data) => { clearTimeout(to); res(st === 'complete' ? data.regeocode.formattedAddress : ''); });
+        });
+      });
       if (r) { _geoCache[k] = r; return r; }
     } catch (e) {}
   }
   try {
     const u = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lon + '&zoom=18&accept-language=zh-CN';
-    const d = await (await fetch(u, { headers: { 'Accept': 'application/json' } })).json();
+    const ctl = new AbortController();
+    const to = setTimeout(() => ctl.abort(), 3000);
+    let d = null;
+    try { d = await (await fetch(u, { headers: { 'Accept': 'application/json' }, signal: ctl.signal })).json(); } finally { clearTimeout(to); }
+    if (!d) return fallback0();
     const r = (d.display_name || '').split(',').slice(0, 3).join(' ');
     if (r) { _geoCache[k] = r; return r; }
   } catch (e) {}
-  const fallback = lat.toFixed(6) + ', ' + lon.toFixed(6);
-  _geoCache[k] = fallback; return fallback;
+  function fallback0() {
+    const f = lat.toFixed(6) + ', ' + lon.toFixed(6);
+    _geoCache[k] = f; return f;
+  }
+  return fallback0();
 }
 
 async function geoFill(lat, lon) {
@@ -453,16 +463,29 @@ async function refresh() {
     document.getElementById('evList').style.color = '';
     const box = document.getElementById('evList');
     if (!list.length) box.textContent = '暂无报警记录';
-    else box.innerHTML = await Promise.all(list.slice(0, 20).map(async e => {
-      let addr = e.addr || '';
-      if (!addr && e.lat) addr = await reverseGeo(e.lat, e.lon);
-      if (!addr) addr = '危险求救信号';
-      return '<div class="ev"><div class="t">🚨 ' + fmtTime(e.ts) + (e.type === 'SAFE' ? '（已解除）' : '') + '</div>' +
-        '<div class="a">' + addr + '</div>' +
-      '<div class="c">' + (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '无定位数据') +
-      (e.lat ? ' · <a class="link" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图查看</a>' : '') +
-        '</div></div>';
-    }));
+    else {
+      // 同步渲染 (带坐标), 地址异步补填 —— 避免 reverseGeo 卡死列表
+      const items = list.slice(0, 20).map(e => {
+        const addr0 = e.addr || (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '危险求救信号');
+        return '<div class="ev" data-k="' + (e.lat ? e.lat.toFixed(5) + ',' + e.lon.toFixed(5) : '') + '">' +
+          '<div class="t">' + (e.type === 'SAFE' ? '' : '⚠ ') + fmtTime(e.ts) + (e.type === 'SAFE' ? '（已解除）' : '') + '</div>' +
+          '<div class="a">' + addr0 + '</div>' +
+          '<div class="c">' + (e.lat ? e.lat.toFixed(6) + ', ' + e.lon.toFixed(6) : '无定位数据') +
+          (e.lat ? ' · <a class="link" target="_blank" href="https://uri.amap.com/marker?position=' + e.lon + ',' + e.lat + '">地图查看</a>' : '') +
+          '</div></div>';
+      }).join('');
+      box.innerHTML = items;
+      // 异步补填地址
+      list.slice(0, 20).forEach(async e => {
+        if (!e.lat) return;
+        const k = e.lat.toFixed(5) + ',' + e.lon.toFixed(5);
+        let addr = e.addr || '';
+        if (!addr) addr = await reverseGeo(e.lat, e.lon);
+        if (!addr) addr = '危险求救信号';
+        const el = box.querySelector('.ev[data-k="' + k + '"] .a');
+        if (el) el.textContent = addr;
+      });
+    }
 
     evLayer.clearLayers();
     list.filter(e => e.type !== 'SAFE' && e.lat).slice(0, 10).forEach(e => {
