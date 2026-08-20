@@ -1,6 +1,6 @@
 {
  "sos": false,
- "updated": 1787195207,
+ "updated": 1787195211,
  "events": [
   {
    "ts": 1786553864,
@@ -193,12 +193,12 @@
   }
  ],
  "position": {
-  "lat": 39.899854,
-  "lon": 116.313589,
-  "sats": 23,
-  "inFence": false,
-  "dist": 0.0,
-  "ts": 1787195191,
+  "lat": 39.899848,
+  "lon": 116.313591,
+  "sats": 24,
+  "inFence": true,
+  "dist": -101.1,
+  "ts": 1787195211,
   "sos": false
  },
  "fenceAck": {
