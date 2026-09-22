@@ -1,6 +1,6 @@
 {
  "sos": false,
- "updated": 1790104557,
+ "updated": 1790104693,
  "events": [
   {
    "ts": 1786553864,
@@ -274,7 +274,7 @@
   "sats": 0,
   "inFence": false,
   "dist": 0.0,
-  "ts": 1790104557,
+  "ts": 1790104693,
   "sos": false
  },
  "fenceAck": {
